@@ -128,7 +128,7 @@ func (wqs *WeightedQuantilesSummary) Merge(other WeightedQuantilesSummary) {
 			value:   it1.value,
 			weight:  it1.weight,
 			minRank: it1.minRank + nextMinRank2,
-			maxRank: it1.maxRank + otherEntries[0].maxRank,
+			maxRank: it1.maxRank + otherEntries[len(baseEntries)-1].maxRank,
 		}
 		wqs.entries = append(wqs.entries, se)
 		i++
@@ -139,7 +139,7 @@ func (wqs *WeightedQuantilesSummary) Merge(other WeightedQuantilesSummary) {
 			value:   it2.value,
 			weight:  it2.weight,
 			minRank: it2.minRank + nextMinRank1,
-			maxRank: it2.maxRank + baseEntries[0].maxRank,
+			maxRank: it2.maxRank + baseEntries[len(baseEntries)-1].maxRank,
 		}
 		wqs.entries = append(wqs.entries, se)
 		j++
@@ -191,7 +191,7 @@ func (wqs *WeightedQuantilesSummary) Compress(sizeHint int64, minEps float64) {
 
 	if li+1 < len(wqs.entries) {
 		//TODO: check this
-		wqs.entries[wi] = wqs.entries[0]
+		wqs.entries[wi] = wqs.entries[len(wqs.entries)-1]
 		wi++
 	}
 
@@ -222,6 +222,33 @@ func (wqs *WeightedQuantilesSummary) GenerateBoundaries(numBoundaries int64) []f
 	return output
 }
 
+// GenerateQuantiles ...
+func (wqs *WeightedQuantilesSummary) GenerateQuantiles(numQuantiles int64) []float64 {
+	output := []float64{}
+	if len(wqs.entries) == 0 {
+		return output
+	}
+	if numQuantiles < 2 {
+		numQuantiles = 2
+	}
+	curIdx := 0
+	for rank := 0.0; rank <= float64(numQuantiles); rank++ {
+		d2 := 2 * (rank * wqs.entries[len(wqs.entries)-1].maxRank / float64(numQuantiles))
+		nextIdx := curIdx + 1
+		for nextIdx < len(wqs.entries) && d2 >= wqs.entries[nextIdx].minRank+wqs.entries[nextIdx].maxRank {
+			nextIdx++
+		}
+		curIdx = nextIdx - 1
+		// Determine insertion order.
+		if nextIdx == len(wqs.entries) || d2 < wqs.entries[curIdx].nextMinRank()+wqs.entries[nextIdx].prevMaxRank() {
+			output = append(output, wqs.entries[curIdx].value)
+		} else {
+			output = append(output, wqs.entries[nextIdx].value)
+		}
+	}
+	return output
+}
+
 // ApproximationError ...
 func (wqs *WeightedQuantilesSummary) ApproximationError() float64 {
 	if len(wqs.entries) == 0 {
@@ -239,6 +266,22 @@ func (wqs *WeightedQuantilesSummary) ApproximationError() float64 {
 		}
 	}
 	return maxGap / wqs.TotalWeight()
+}
+
+// MinValue ...
+func (wqs *WeightedQuantilesSummary) MinValue() float64 {
+	if len(wqs.entries) != 0 {
+		return wqs.entries[0].value
+	}
+	return 0
+}
+
+// MaxValue ...
+func (wqs *WeightedQuantilesSummary) MaxValue() float64 {
+	if len(wqs.entries) != 0 {
+		return wqs.entries[len(wqs.entries)-1].value
+	}
+	return 0
 }
 
 // TotalWeight ...
