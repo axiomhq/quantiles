@@ -44,6 +44,7 @@ func (wqs *WeightedQuantilesSummary) BuildFromBufferEntries(bes []BufferEntry) {
 			maxRank: cumWeight + curWeight,
 		}
 		wqs.entries = append(wqs.entries, se)
+		cumWeight += curWeight
 	}
 }
 
@@ -148,36 +149,32 @@ func (wqs *WeightedQuantilesSummary) Merge(other WeightedQuantilesSummary) {
 
 // Compress ...
 func (wqs *WeightedQuantilesSummary) Compress(sizeHint int64, minEps float64) {
-	if sizeHint < 2 {
-		sizeHint = 2
-	}
+	// No-op if we're already within the size requirement.
+	sizeHint = maxInt64(sizeHint, 2)
 	if int64(len(wqs.entries)) <= sizeHint {
 		return
 	}
 
 	// First compute the max error bound delta resulting from this compression.
-	max := 1.0 / float64(sizeHint)
-	if max > minEps {
-		max = minEps
-	}
-	epsDelta := wqs.TotalWeight() * max
+	epsDelta := wqs.TotalWeight() * maxFloat64(1/float64(sizeHint), minEps)
 
 	// Compress elements ensuring approximation bounds and elements diversity are both maintained.
-	var addAccumulator int64
-	addStep := int64(len(wqs.entries))
+	var (
+		addAccumulator int64
+		addStep        = int64(len(wqs.entries))
+	)
 
 	wi := 1
 	li := wi
 
-	for ri := 0; ri < len(wqs.entries); ri++ {
+	for ri := 0; ri+1 != len(wqs.entries); {
 		ni := ri + 1
-		read := wqs.entries[ri]
-		next := wqs.entries[ni]
-		for ni < len(wqs.entries) && addAccumulator < addStep && next.prevMaxRank()-read.nextMinRank() <= epsDelta {
+		for ni != len(wqs.entries) && addAccumulator < addStep &&
+			wqs.entries[ni].prevMaxRank()-wqs.entries[ri].nextMinRank() <= epsDelta {
 			addAccumulator += sizeHint
 			ni++
 		}
-		if ri == ni-1 {
+		if wqs.entries[ri] == wqs.entries[ni-1] {
 			ri++
 		} else {
 			ri = ni - 1
@@ -189,13 +186,11 @@ func (wqs *WeightedQuantilesSummary) Compress(sizeHint int64, minEps float64) {
 		addAccumulator -= addStep
 	}
 
-	if li+1 < len(wqs.entries) {
-		//TODO: check this
+	if li+1 != len(wqs.entries) {
 		wqs.entries[wi] = wqs.entries[len(wqs.entries)-1]
 		wi++
 	}
 
-	// TODO: check if   entries_.resize(write_it - entries_.begin());
 	wqs.entries = wqs.entries[:wi]
 }
 
@@ -290,4 +285,9 @@ func (wqs *WeightedQuantilesSummary) TotalWeight() float64 {
 		return wqs.entries[len(wqs.entries)-1].maxRank
 	}
 	return 0
+}
+
+// Size ...
+func (wqs *WeightedQuantilesSummary) Size() int64 {
+	return int64(len(wqs.entries))
 }
