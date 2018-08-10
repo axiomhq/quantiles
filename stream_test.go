@@ -52,8 +52,6 @@ func TestNonZeroEps(t *testing.T) {
 	assert.Equal(tup, tuple{26, 25001})
 }
 
-type WeightedQuantilesStreamDummy WeightedQuantilesStream
-
 func generateFixedUniformSummary(workerID int32, maxElements int64, totalWeight *float64, stream *WeightedQuantilesStream) error {
 	for i := int64(0); i < maxElements; i++ {
 		x := float64(i) / float64(maxElements)
@@ -128,7 +126,7 @@ func testSingleWorkerStreams(t *testing.T, eps float64, maxElements int64,
 	w := sum.TotalWeight()
 	if math.Abs(totalWeight-w) > 1e-6 {
 		t.Errorf("expected %v <= %v", math.Abs(totalWeight-w), 1e-6)
-		//return
+		return
 	}
 
 	// Verify expected quantiles.
@@ -140,7 +138,7 @@ func testSingleWorkerStreams(t *testing.T, eps float64, maxElements int64,
 	for i, eq := range expectedQuantiles {
 		if val := math.Abs(actuals[i] - eq); val > quantilesMatcherEpsilon {
 			t.Errorf("expected %v <= %v", val, quantilesMatcherEpsilon)
-			//return
+			return
 		}
 	}
 }
@@ -194,11 +192,138 @@ func TestStreamFixedNonUniform(t *testing.T) {
 		[]float64{0, math.Sqrt(0.1), math.Sqrt(0.2), math.Sqrt(0.3), math.Sqrt(0.4), math.Sqrt(0.5), math.Sqrt(0.6), math.Sqrt(0.7), math.Sqrt(0.8), math.Sqrt(0.9), 1.0}, 1e-2)
 }
 
+func TestStreamRandUniformFixedWeights(t *testing.T) {
+	var (
+		eps         = 0.01
+		maxElements = int64(1 << 16)
+	)
+	testSingleWorkerStreams(t, eps, maxElements, generateRandUniformFixedWeightsSummary,
+		[]float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}, 1e-2)
+}
+
 func TestStreamRandUniformRandWeights(t *testing.T) {
 	var (
 		eps         = 0.01
 		maxElements = int64(1 << 16)
 	)
 	testSingleWorkerStreams(t, eps, maxElements, generateRandUniformRandWeightsSummary,
+		[]float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}, 1e-2)
+}
+
+// Distributed tests.
+func testDistributedStreams(t *testing.T, numWorkers int32, eps float64, maxElements int64,
+	workerSummaryGenerator workerSummaryGeneratorFunc,
+	expectedQuantiles []float64, quantilesMatcherEpsilon float64) {
+
+	// Simulate streams on each worker running independently
+	totalWeight := 0.0
+	workerSummaries := [][]*SummaryEntry{}
+	for i := int32(0); i < numWorkers; i++ {
+		stream, err := NewWeightedQuantilesStream(eps/2, maxElements)
+		if err != nil {
+			t.Error("expected no error, got", err)
+			return
+		}
+		workerSummaryGenerator(i, maxElements/int64(numWorkers), &totalWeight, stream)
+		sum, err := stream.GetFinalSummary()
+		if err != nil {
+			t.Error("expected no error, got ", err)
+			return
+		}
+		workerSummaries = append(workerSummaries, sum.entries)
+	}
+
+	// In the accumulation phase, we aggregate the summaries from each worker
+	// and build an overall summary while maintaining error bounds by ensuring we
+	// don't increase the error by more than eps / 2.
+	reducerStream, err := NewWeightedQuantilesStream(eps, maxElements)
+	if err != nil {
+		t.Error("expected no error, got ", err)
+		return
+	}
+	for _, summary := range workerSummaries {
+		if err := reducerStream.PushSummary(summary); err != nil {
+			t.Error("expected no error, got", err)
+			return
+		}
+	}
+	if err := reducerStream.Finalize(); err != nil {
+		t.Error("expected no error, got", err)
+		return
+	}
+
+	// Ensure we didn't lose track of any elements and are
+	// within approximation error bound.
+	if val, err := reducerStream.ApproximationError(0); err != nil {
+		t.Error("expected no error, got ", err)
+		return
+	} else if val > eps {
+		t.Errorf("expected val <= %v, got %v > %v", eps, val, eps)
+		return
+	}
+
+	sum, err := reducerStream.GetFinalSummary()
+	if err != nil {
+		t.Error("expected no error, got ", err)
+		return
+	}
+	w := sum.TotalWeight()
+	if math.Abs(totalWeight-w) > totalWeight {
+		t.Errorf("expected %v <= %v", math.Abs(totalWeight-w), totalWeight)
+		return
+	}
+
+	// Verify expected quantiles.
+	actuals, err := reducerStream.GenerateQuantiles(int64(len(expectedQuantiles) - 1))
+	if err != nil {
+		t.Error("expected no error, got ", err)
+		return
+	}
+	for i, eq := range expectedQuantiles {
+		if val := math.Abs(actuals[i] - eq); val > quantilesMatcherEpsilon {
+			t.Errorf("expected %v <= %v", val, quantilesMatcherEpsilon)
+			return
+		}
+	}
+}
+
+func TestStreamFixedUniformDistributed(t *testing.T) {
+	var (
+		numWorkers  int32 = 10
+		eps               = 0.01
+		maxElements       = int64(numWorkers) * int64(1<<16)
+	)
+	testDistributedStreams(t, numWorkers, eps, maxElements, generateFixedUniformSummary,
+		[]float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}, 1e-2)
+}
+
+func TestStreamFixedNonUniformDistributed(t *testing.T) {
+	var (
+		numWorkers  int32 = 10
+		eps               = 0.01
+		maxElements       = int64(numWorkers) * int64(1<<16)
+	)
+	testDistributedStreams(t, numWorkers, eps, maxElements, generateFixedNonUniformSummary,
+		[]float64{0, math.Sqrt(0.1), math.Sqrt(0.2), math.Sqrt(0.3), math.Sqrt(0.4), math.Sqrt(0.5), math.Sqrt(0.6), math.Sqrt(0.7), math.Sqrt(0.8), math.Sqrt(0.9), 1.0}, 1e-2)
+
+}
+
+func TestRandUniformFixedWeightsDistributed(t *testing.T) {
+	var (
+		numWorkers  int32 = 10
+		eps               = 0.01
+		maxElements       = int64(numWorkers) * int64(1<<16)
+	)
+	testDistributedStreams(t, numWorkers, eps, maxElements, generateRandUniformFixedWeightsSummary,
+		[]float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}, 1e-2)
+}
+
+func TestRandUniformRandWeightsDistributed(t *testing.T) {
+	var (
+		numWorkers  int32 = 10
+		eps               = 0.01
+		maxElements       = int64(numWorkers) * int64(1<<16)
+	)
+	testDistributedStreams(t, numWorkers, eps, maxElements, generateRandUniformRandWeightsSummary,
 		[]float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}, 1e-2)
 }
