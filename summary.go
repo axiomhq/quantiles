@@ -58,18 +58,18 @@ func (wqs *WeightedQuantilesSummary) BuildFromSummaryEntries(ses []*SummaryEntry
 }
 
 // Merge ...
-func (wqs *WeightedQuantilesSummary) Merge(other WeightedQuantilesSummary) {
+func (wqs *WeightedQuantilesSummary) Merge(other *WeightedQuantilesSummary) {
 	otherEntries := other.entries
 	if len(otherEntries) == 0 {
 		return
 	}
 	if len(wqs.entries) == 0 {
-		wqs.BuildFromSummaryEntries(otherEntries)
+		wqs.BuildFromSummaryEntries(other.entries)
 		return
 	}
 
-	baseEntries := make([]*SummaryEntry, len(otherEntries))
-	for i, e := range otherEntries {
+	baseEntries := make([]*SummaryEntry, len(wqs.entries))
+	for i, e := range wqs.entries {
 		baseEntries[i] = e
 	}
 	wqs.entries = []*SummaryEntry{}
@@ -82,39 +82,38 @@ func (wqs *WeightedQuantilesSummary) Merge(other WeightedQuantilesSummary) {
 	// We handle the special case when the next two elements from either
 	// summary are equal, in which case we just merge the two elements
 	// and simultaneously update both ranks.
-	var nextMinRank1, nextMinRank2 float64
-	var i, j int
+	var (
+		i            int
+		j            int
+		nextMinRank1 float64
+		nextMinRank2 float64
+	)
 
 	for i != len(baseEntries) && j != len(otherEntries) {
 		it1 := baseEntries[i]
 		it2 := otherEntries[j]
-		if compFn(it1, it2) {
-			se := &SummaryEntry{
-				value:   it1.value,
-				weight:  it1.weight,
+		if it1.value < it2.value {
+			wqs.entries = append(wqs.entries, &SummaryEntry{
+				value: it1.value, weight: it1.weight,
 				minRank: it1.minRank + nextMinRank2,
 				maxRank: it1.maxRank + it2.prevMaxRank(),
-			}
-			wqs.entries = append(wqs.entries, se)
+			})
 			nextMinRank1 = it1.nextMinRank()
 			i++
-		} else if compFn(it2, it1) {
-			se := &SummaryEntry{
-				value:   it2.value,
-				weight:  it2.weight,
+		} else if it1.value > it2.value {
+			wqs.entries = append(wqs.entries, &SummaryEntry{
+				value: it2.value, weight: it2.weight,
 				minRank: it2.minRank + nextMinRank1,
 				maxRank: it2.maxRank + it1.prevMaxRank(),
-			}
-			wqs.entries = append(wqs.entries, se)
+			})
 			nextMinRank2 = it2.nextMinRank()
+			j++
 		} else {
-			se := &SummaryEntry{
-				value:   it1.value,
-				weight:  it1.weight + it2.weight,
+			wqs.entries = append(wqs.entries, &SummaryEntry{
+				value: it1.value, weight: it1.weight + it2.weight,
 				minRank: it1.minRank + it2.minRank,
 				maxRank: it1.maxRank + it2.maxRank,
-			}
-			wqs.entries = append(wqs.entries, se)
+			})
 			nextMinRank1 = it1.nextMinRank()
 			nextMinRank2 = it2.nextMinRank()
 			i++
@@ -125,24 +124,20 @@ func (wqs *WeightedQuantilesSummary) Merge(other WeightedQuantilesSummary) {
 	// Fill in any residual.
 	for i != len(baseEntries) {
 		it1 := baseEntries[i]
-		se := &SummaryEntry{
-			value:   it1.value,
-			weight:  it1.weight,
+		wqs.entries = append(wqs.entries, &SummaryEntry{
+			value: it1.value, weight: it1.weight,
 			minRank: it1.minRank + nextMinRank2,
-			maxRank: it1.maxRank + otherEntries[len(baseEntries)-1].maxRank,
-		}
-		wqs.entries = append(wqs.entries, se)
+			maxRank: it1.maxRank + otherEntries[len(otherEntries)-1].maxRank,
+		})
 		i++
 	}
 	for j != len(otherEntries) {
 		it2 := otherEntries[j]
-		se := &SummaryEntry{
-			value:   it2.value,
-			weight:  it2.weight,
+		wqs.entries = append(wqs.entries, &SummaryEntry{
+			value: it2.value, weight: it2.weight,
 			minRank: it2.minRank + nextMinRank1,
 			maxRank: it2.maxRank + baseEntries[len(baseEntries)-1].maxRank,
-		}
-		wqs.entries = append(wqs.entries, se)
+		})
 		j++
 	}
 }
