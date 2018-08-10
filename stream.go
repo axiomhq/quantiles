@@ -27,7 +27,7 @@ func NewWeightedQuantilesStream(eps float64, maxElements int64) (*WeightedQuanti
 		return nil, err
 	}
 
-	buffer, err := NewWeightedQuantilesBuffer(blockSize, maxLevels)
+	buffer, err := NewWeightedQuantilesBuffer(blockSize, maxElements)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,6 @@ func (wqs *WeightedQuantilesStream) PushEntry(value float64, weight float64) err
 	}
 
 	if wqs.buffer.IsFull() {
-		fmt.Println(">>>")
 		err = wqs.PushBuffer(wqs.buffer)
 	}
 	return err
@@ -91,7 +90,6 @@ func (wqs *WeightedQuantilesStream) Finalize() error {
 	if wqs.finalized {
 		return fmt.Errorf("Finalize() already called")
 	}
-
 	// Flush any remaining buffer elements.
 	wqs.PushBuffer(wqs.buffer)
 
@@ -135,7 +133,6 @@ func (wqs *WeightedQuantilesStream) propagateLocalSummary() error {
 		// Check if we need to compress and propagate summary higher.
 		if currentSummary.Size() == 0 ||
 			wqs.localSummary.Size() <= wqs.blockSize+1 {
-			fmt.Println(wqs.localSummary, currentSummary)
 			*currentSummary = *(wqs.localSummary)
 			wqs.localSummary = NewWeightedQuantilesSummary()
 			settled = true

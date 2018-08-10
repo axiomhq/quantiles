@@ -1,7 +1,6 @@
 package quantiles
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	"testing"
@@ -58,7 +57,9 @@ type WeightedQuantilesStreamDummy WeightedQuantilesStream
 func generateFixedUniformSummary(workerID int32, maxElements int64, totalWeight *float64, stream *WeightedQuantilesStream) error {
 	for i := int64(0); i < maxElements; i++ {
 		x := float64(i) / float64(maxElements)
-		stream.PushEntry(x, 1)
+		if err := stream.PushEntry(x, 1); err != nil {
+			return err
+		}
 		*totalWeight++
 	}
 	return stream.Finalize()
@@ -104,7 +105,10 @@ func testSingleWorkerStreams(t *testing.T, eps float64, maxElements int64,
 		t.Error("expected no error, got ", err)
 		return
 	}
-	workerSummaryGenerator(0, maxElements, &totalWeight, stream)
+	if err := workerSummaryGenerator(0, maxElements, &totalWeight, stream); err != nil {
+		t.Error("expected no error, got ", err)
+		return
+	}
 
 	// Ensure we didn't lose track of any elements and are
 	// within approximation error bound.
@@ -134,7 +138,6 @@ func testSingleWorkerStreams(t *testing.T, eps float64, maxElements int64,
 		return
 	}
 	for i, eq := range expectedQuantiles {
-		fmt.Println(i, actuals[i], eq, quantilesMatcherEpsilon)
 		if val := math.Abs(actuals[i] - eq); val > quantilesMatcherEpsilon {
 			t.Errorf("expected %v <= %v", val, quantilesMatcherEpsilon)
 			//return

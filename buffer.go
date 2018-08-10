@@ -33,6 +33,7 @@ func NewWeightedQuantilesBuffer(blockSize, maxElements int64) (*WeightedQuantile
 	if maxSize > maxElements {
 		maxSize = maxElements
 	}
+
 	if maxSize <= 0 {
 		return nil, fmt.Errorf("Invalid buffer specification: (%v, %v)", blockSize, maxElements)
 	}
@@ -65,6 +66,7 @@ func (wqb *WeightedQuantilesBuffer) GenerateEntryList() []BufferEntry {
 	for i, val := range wqb.vec {
 		ret[i] = val
 	}
+	wqb.vec = []BufferEntry{}
 
 	numEntries := 0
 	for i := 1; i < len(ret); i++ {
