@@ -18,15 +18,9 @@ type WeightedQuantilesStream struct {
 
 // NewWeightedQuantilesStream ...
 func NewWeightedQuantilesStream(eps float64, maxElements int64) (*WeightedQuantilesStream, error) {
-	if eps > 0 {
+	if eps <= 0 {
 		return nil, fmt.Errorf("an epsilon value of zero is not allowed")
 	}
-	/*
-		buffer, err := NewWeightedQuantilesBuffer(1, 2)
-		if err != nil {
-			return nil, err
-		}
-	*/
 
 	maxLevels, blockSize, err := getQuantileSpecs(eps, maxElements)
 	if err != nil {
@@ -39,11 +33,13 @@ func NewWeightedQuantilesStream(eps float64, maxElements int64) (*WeightedQuanti
 	}
 
 	stream := &WeightedQuantilesStream{
-		eps:       eps,
-		buffer:    buffer,
-		finalized: false,
-		maxLevels: maxLevels,
-		blockSize: blockSize,
+		eps:           eps,
+		buffer:        buffer,
+		finalized:     false,
+		maxLevels:     maxLevels,
+		blockSize:     blockSize,
+		localSummary:  NewWeightedQuantilesSummary(),
+		summaryLevels: []*WeightedQuantilesSummary{},
 	}
 	return stream, nil
 }
@@ -61,6 +57,7 @@ func (wqs *WeightedQuantilesStream) PushEntry(value float64, weight float64) err
 	}
 
 	if wqs.buffer.IsFull() {
+		fmt.Println(">>>")
 		err = wqs.PushBuffer(wqs.buffer)
 	}
 	return err
@@ -98,11 +95,10 @@ func (wqs *WeightedQuantilesStream) Finalize() error {
 	// Flush any remaining buffer elements.
 	wqs.PushBuffer(wqs.buffer)
 
-	// Create final merged summary.
+	// Create final merged summary
 	wqs.localSummary.Clear()
 	for _, summary := range wqs.summaryLevels {
 		wqs.localSummary.Merge(summary)
-		summary.Clear()
 	}
 
 	wqs.summaryLevels = []*WeightedQuantilesSummary{}
@@ -129,7 +125,7 @@ func (wqs *WeightedQuantilesStream) propagateLocalSummary() error {
 	for settled := false; !settled; level++ {
 		// Ensure we have enough depth.
 		if int64(len(wqs.summaryLevels)) <= level {
-			wqs.summaryLevels = append(wqs.summaryLevels, nil)
+			wqs.summaryLevels = append(wqs.summaryLevels, &WeightedQuantilesSummary{})
 		}
 
 		// Merge summaries.
@@ -139,10 +135,11 @@ func (wqs *WeightedQuantilesStream) propagateLocalSummary() error {
 		// Check if we need to compress and propagate summary higher.
 		if currentSummary.Size() == 0 ||
 			wqs.localSummary.Size() <= wqs.blockSize+1 {
-			var currentSummary *WeightedQuantilesSummary
+			fmt.Println(wqs.localSummary, currentSummary)
 			*currentSummary = *(wqs.localSummary)
-			wqs.localSummary = nil
+			wqs.localSummary = NewWeightedQuantilesSummary()
 			settled = true
+
 		} else {
 			// Compress, empty current level and propagate.
 			wqs.localSummary.Compress(wqs.blockSize, wqs.eps)

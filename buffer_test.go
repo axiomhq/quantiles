@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestInvalid(t *testing.T) {
+func TestBufferInvalid(t *testing.T) {
 	if _, err := NewWeightedQuantilesBuffer(2, 0); err == nil {
 		t.Error("expected error, got nil")
 	}
@@ -14,7 +14,7 @@ func TestInvalid(t *testing.T) {
 	}
 }
 
-func TestPushEntryNotFull(t *testing.T) {
+func TestBufferPushEntryNotFull(t *testing.T) {
 	buf, err := NewWeightedQuantilesBuffer(2, 100)
 	if err != nil {
 		t.Error("expected no err, got", err)
@@ -32,7 +32,7 @@ func TestPushEntryNotFull(t *testing.T) {
 	}
 }
 
-func TestPushEntryFull(t *testing.T) {
+func TestBufferPushEntryFull(t *testing.T) {
 	buf, err := NewWeightedQuantilesBuffer(2, 100)
 	if err != nil {
 		t.Error("expected no err, got", err)
@@ -54,7 +54,7 @@ func TestPushEntryFull(t *testing.T) {
 		t.Errorf("expected %v, got %v", expected, got)
 	}
 }
-func TestPushEntryFullDeath(t *testing.T) {
+func TestBufferPushEntryFullDeath(t *testing.T) {
 	buf, err := NewWeightedQuantilesBuffer(2, 100)
 	if err != nil {
 		t.Error("expected no err, got", err)

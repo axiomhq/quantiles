@@ -76,6 +76,9 @@ func (wqb *WeightedQuantilesBuffer) GenerateEntryList() []BufferEntry {
 			ret[numEntries].weight += ret[i].weight
 		}
 	}
+	if numEntries == 0 {
+		return ret
+	}
 	return ret[:numEntries+1]
 }
 

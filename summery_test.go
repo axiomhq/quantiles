@@ -84,7 +84,7 @@ func (wqsd *WeightedQuantilesSummaryDummy) setup() error {
 	return nil
 }
 
-func TestBuildFromBuffer(t *testing.T) {
+func TestSummaryBuildFromBuffer(t *testing.T) {
 	wqsd, err := NewWeightedQuantilesSummaryDummy()
 	if err != nil {
 		t.Error(err)
@@ -133,7 +133,7 @@ func TestBuildFromBuffer(t *testing.T) {
 	}
 }
 
-func TestCompressSeparately(t *testing.T) {
+func TestSummaryCompressSeparately(t *testing.T) {
 	wqsd, err := NewWeightedQuantilesSummaryDummy()
 	if err != nil {
 		t.Error(err)
@@ -174,7 +174,7 @@ func TestCompressSeparately(t *testing.T) {
 		}
 	}
 }
-func TestCompressSequentially(t *testing.T) {
+func TestSummaryCompressSequentially(t *testing.T) {
 	wqsd, err := NewWeightedQuantilesSummaryDummy()
 	if err != nil {
 		t.Error(err)
@@ -217,7 +217,7 @@ func TestCompressSequentially(t *testing.T) {
 	}
 }
 
-func TestCompressRandomized(t *testing.T) {
+func TestSummaryCompressRandomized(t *testing.T) {
 	wqsd, err := NewWeightedQuantilesSummaryDummy()
 	if err != nil {
 		t.Error(err)
@@ -264,7 +264,7 @@ func TestCompressRandomized(t *testing.T) {
 	}
 }
 
-func TestMergeSymmetry(t *testing.T) {
+func TestSummaryMergeSymmetry(t *testing.T) {
 	assert := assert.New(t)
 
 	wqsd, err := NewWeightedQuantilesSummaryDummy()
@@ -302,7 +302,7 @@ func TestMergeSymmetry(t *testing.T) {
 	assert.Equal(sum2.Size(), int64(14))
 }
 
-func TestCompressThenMerge(t *testing.T) {
+func TestSummaryCompressThenMerge(t *testing.T) {
 	assert := assert.New(t)
 	wqsd, err := NewWeightedQuantilesSummaryDummy()
 	if err != nil {
