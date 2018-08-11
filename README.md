@@ -32,3 +32,9 @@ using a reasonable amount of RAM.
 An epsilon value of zero would make the algorithm extremely inefficent and
 therefore, is disallowed.
 
+
+## TODO
+* [ ] Implement an online estimator without the need of finalizing the stream.
+* [ ] Add proper documentation.
+* [ ] Benchmark
+* [ ] Add serialization
