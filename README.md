@@ -26,8 +26,7 @@ using a reasonable amount of RAM.
 
 ### Complexity:
 * Compute: `O(n * log(1/eps * log(eps * n)))`.
-* Memory: `O(1/eps * log^2(eps * n))` <- for one worker streaming through the
-                                     entire dataset.
+* Memory: `O(1/eps * log^2(eps * n))` <- for one worker streaming through the entire dataset.
 
 An epsilon value of zero would make the algorithm extremely inefficent and
 therefore, is disallowed.

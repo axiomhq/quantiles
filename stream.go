@@ -89,6 +89,7 @@ func (stream *Stream) Finalize() error {
 	if stream.finalized {
 		return fmt.Errorf("Finalize() already called")
 	}
+
 	// Flush any remaining buffer elements.
 	stream.pushBuffer(stream.buffer)
 
