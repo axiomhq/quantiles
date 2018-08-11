@@ -5,30 +5,18 @@ import (
 	"sort"
 )
 
-// BufferEntry ...
-type BufferEntry struct {
+// bufEntry ...
+type bufEntry struct {
 	value  float64
 	weight float64
 }
 
-// LessThan ...
-func (be BufferEntry) LessThan(o BufferEntry) bool {
-	return be.value < o.value
-}
-
-// Equals ...
-func (be *BufferEntry) Equals(o *BufferEntry) bool {
-	return be.value == o.value && be.weight == o.weight
-}
-
-// WeightedQuantilesBuffer ...
-type WeightedQuantilesBuffer struct {
-	vec     []BufferEntry
+type buffer struct {
+	vec     []bufEntry
 	maxSize int64
 }
 
-// NewWeightedQuantilesBuffer ...
-func NewWeightedQuantilesBuffer(blockSize, maxElements int64) (*WeightedQuantilesBuffer, error) {
+func newBuffer(blockSize, maxElements int64) (*buffer, error) {
 	maxSize := blockSize << 1
 	if maxSize > maxElements {
 		maxSize = maxElements
@@ -38,35 +26,34 @@ func NewWeightedQuantilesBuffer(blockSize, maxElements int64) (*WeightedQuantile
 		return nil, fmt.Errorf("Invalid buffer specification: (%v, %v)", blockSize, maxElements)
 	}
 
-	return &WeightedQuantilesBuffer{
+	return &buffer{
 		maxSize: maxSize,
-		vec:     make([]BufferEntry, 0),
+		vec:     make([]bufEntry, 0),
 	}, nil
 }
 
-// PushEntry ...
-func (wqb *WeightedQuantilesBuffer) PushEntry(value, weight float64) error {
+func (buf *buffer) push(value, weight float64) error {
 	//QCHECK magic
-	if wqb.IsFull() {
-		return fmt.Errorf("Buffer already full: %v", wqb.maxSize)
+	if buf.isFull() {
+		return fmt.Errorf("Buffer already full: %v", buf.maxSize)
 	}
 
 	if weight > 0 {
-		wqb.vec = append(wqb.vec, BufferEntry{value, weight})
+		buf.vec = append(buf.vec, bufEntry{value, weight})
 	}
 	return nil
 }
 
-// GenerateEntryList returns a sorted vector view of the base buffer and clears the buffer.
+// generateEntryList returns a sorted vector view of the base buffer and clears the buffer.
 // Callers should minimize how often this is called, ideally only right after
 // the buffer becomes full.
-func (wqb *WeightedQuantilesBuffer) GenerateEntryList() []BufferEntry {
-	sort.Slice(wqb.vec, func(i, j int) bool { return wqb.vec[i].LessThan(wqb.vec[j]) })
-	ret := make([]BufferEntry, len(wqb.vec), len(wqb.vec))
-	for i, val := range wqb.vec {
+func (buf *buffer) generateEntryList() []bufEntry {
+	sort.Slice(buf.vec, func(i, j int) bool { return buf.vec[i].value < buf.vec[j].value })
+	ret := make([]bufEntry, len(buf.vec), len(buf.vec))
+	for i, val := range buf.vec {
 		ret[i] = val
 	}
-	wqb.vec = []BufferEntry{}
+	buf.vec = []bufEntry{}
 
 	numEntries := 0
 	for i := 1; i < len(ret); i++ {
@@ -84,17 +71,7 @@ func (wqb *WeightedQuantilesBuffer) GenerateEntryList() []BufferEntry {
 	return ret[:numEntries+1]
 }
 
-// Size ...
-func (wqb *WeightedQuantilesBuffer) Size() int {
-	return len(wqb.vec)
-}
-
-// IsFull ...
-func (wqb *WeightedQuantilesBuffer) IsFull() bool {
-	return int64(len(wqb.vec)) >= wqb.maxSize
-}
-
-// Clear ...
-func (wqb *WeightedQuantilesBuffer) Clear() {
-	wqb.vec = make([]BufferEntry, 0)
+// isFull ...
+func (buf *buffer) isFull() bool {
+	return int64(len(buf.vec)) >= buf.maxSize
 }

@@ -1,50 +1,45 @@
 package quantiles
 
-// SummaryEntry ...
-type SummaryEntry struct {
+// sumEntry ...
+type sumEntry struct {
 	value   float64
 	weight  float64
 	minRank float64
 	maxRank float64
 }
 
-// Equals ...
-func (se SummaryEntry) Equals(o SummaryEntry) bool {
-	return se == o
-}
-
-func (se SummaryEntry) prevMaxRank() float64 {
+func (se sumEntry) prevMaxRank() float64 {
 	return se.maxRank - se.weight
 }
 
-func (se SummaryEntry) nextMinRank() float64 {
+func (se sumEntry) nextMinRank() float64 {
 	return se.minRank + se.weight
 }
 
-func compFn(a, b *SummaryEntry) bool {
+func compFn(a, b *sumEntry) bool {
 	return a.value < b.value
 }
 
-// WeightedQuantilesSummary ...
-type WeightedQuantilesSummary struct {
-	entries []*SummaryEntry
+// Summary ...
+type Summary struct {
+	entries []*sumEntry
 }
 
-// NewWeightedQuantilesSummary ...
-func NewWeightedQuantilesSummary() *WeightedQuantilesSummary {
-	return &WeightedQuantilesSummary{
-		entries: make([]*SummaryEntry, 0),
+// newSummary ...
+func newSummary() *Summary {
+	return &Summary{
+		entries: make([]*sumEntry, 0),
 	}
 }
 
-// BuildFromBufferEntries ...
-func (sum *WeightedQuantilesSummary) BuildFromBufferEntries(bes []BufferEntry) {
-	sum.entries = []*SummaryEntry{}
+// buildFromBufferEntries ...
+func (sum *Summary) buildFromBufferEntries(bes []bufEntry) {
+	sum.entries = []*sumEntry{}
 	// TODO: entries_.reserve(buffer_entries.size());
 	cumWeight := 0.0
 	for _, entry := range bes {
 		curWeight := entry.weight
-		se := &SummaryEntry{
+		se := &sumEntry{
 			value:   entry.value,
 			weight:  entry.weight,
 			minRank: cumWeight,
@@ -56,16 +51,15 @@ func (sum *WeightedQuantilesSummary) BuildFromBufferEntries(bes []BufferEntry) {
 }
 
 // BuildFromSummaryEntries ...
-func (sum *WeightedQuantilesSummary) BuildFromSummaryEntries(ses []*SummaryEntry) {
-	sum.entries = make([]*SummaryEntry, len(ses))
-	// TODO: entries_.reserve(buffer_entries.size());
+func (sum *Summary) BuildFromSummaryEntries(ses []*sumEntry) {
+	sum.entries = make([]*sumEntry, len(ses))
 	for i, entry := range ses {
 		sum.entries[i] = entry
 	}
 }
 
 // Merge ...
-func (sum *WeightedQuantilesSummary) Merge(other *WeightedQuantilesSummary) {
+func (sum *Summary) Merge(other *Summary) {
 	otherEntries := other.entries
 	if len(otherEntries) == 0 {
 		return
@@ -75,12 +69,11 @@ func (sum *WeightedQuantilesSummary) Merge(other *WeightedQuantilesSummary) {
 		return
 	}
 
-	baseEntries := make([]*SummaryEntry, len(sum.entries))
+	baseEntries := make([]*sumEntry, len(sum.entries))
 	for i, e := range sum.entries {
 		baseEntries[i] = e
 	}
-	sum.entries = []*SummaryEntry{}
-	// TODO: entries_.reserve(base_entries.size() + other_entries.size());
+	sum.entries = []*sumEntry{}
 
 	// Merge entries maintaining ranks. The idea is to stack values
 	// in order which we can do in linear time as the two summaries are
@@ -100,7 +93,7 @@ func (sum *WeightedQuantilesSummary) Merge(other *WeightedQuantilesSummary) {
 		it1 := baseEntries[i]
 		it2 := otherEntries[j]
 		if it1.value < it2.value {
-			sum.entries = append(sum.entries, &SummaryEntry{
+			sum.entries = append(sum.entries, &sumEntry{
 				value: it1.value, weight: it1.weight,
 				minRank: it1.minRank + nextMinRank2,
 				maxRank: it1.maxRank + it2.prevMaxRank(),
@@ -108,7 +101,7 @@ func (sum *WeightedQuantilesSummary) Merge(other *WeightedQuantilesSummary) {
 			nextMinRank1 = it1.nextMinRank()
 			i++
 		} else if it1.value > it2.value {
-			sum.entries = append(sum.entries, &SummaryEntry{
+			sum.entries = append(sum.entries, &sumEntry{
 				value: it2.value, weight: it2.weight,
 				minRank: it2.minRank + nextMinRank1,
 				maxRank: it2.maxRank + it1.prevMaxRank(),
@@ -116,7 +109,7 @@ func (sum *WeightedQuantilesSummary) Merge(other *WeightedQuantilesSummary) {
 			nextMinRank2 = it2.nextMinRank()
 			j++
 		} else {
-			sum.entries = append(sum.entries, &SummaryEntry{
+			sum.entries = append(sum.entries, &sumEntry{
 				value: it1.value, weight: it1.weight + it2.weight,
 				minRank: it1.minRank + it2.minRank,
 				maxRank: it1.maxRank + it2.maxRank,
@@ -131,7 +124,7 @@ func (sum *WeightedQuantilesSummary) Merge(other *WeightedQuantilesSummary) {
 	// Fill in any residual.
 	for i != len(baseEntries) {
 		it1 := baseEntries[i]
-		sum.entries = append(sum.entries, &SummaryEntry{
+		sum.entries = append(sum.entries, &sumEntry{
 			value: it1.value, weight: it1.weight,
 			minRank: it1.minRank + nextMinRank2,
 			maxRank: it1.maxRank + otherEntries[len(otherEntries)-1].maxRank,
@@ -140,7 +133,7 @@ func (sum *WeightedQuantilesSummary) Merge(other *WeightedQuantilesSummary) {
 	}
 	for j != len(otherEntries) {
 		it2 := otherEntries[j]
-		sum.entries = append(sum.entries, &SummaryEntry{
+		sum.entries = append(sum.entries, &sumEntry{
 			value: it2.value, weight: it2.weight,
 			minRank: it2.minRank + nextMinRank1,
 			maxRank: it2.maxRank + baseEntries[len(baseEntries)-1].maxRank,
@@ -150,7 +143,7 @@ func (sum *WeightedQuantilesSummary) Merge(other *WeightedQuantilesSummary) {
 }
 
 // Compress ...
-func (sum *WeightedQuantilesSummary) Compress(sizeHint int64, minEps float64) {
+func (sum *Summary) Compress(sizeHint int64, minEps float64) {
 	// No-op if we're already within the size requirement.
 	sizeHint = maxInt64(sizeHint, 2)
 	if int64(len(sum.entries)) <= sizeHint {
@@ -197,14 +190,18 @@ func (sum *WeightedQuantilesSummary) Compress(sizeHint int64, minEps float64) {
 }
 
 // GenerateBoundaries ...
-func (sum *WeightedQuantilesSummary) GenerateBoundaries(numBoundaries int64) []float64 {
+func (sum *Summary) GenerateBoundaries(numBoundaries int64) []float64 {
+	// To construct the boundaries we first run a soft compress over a copy
+	// of the summary and retrieve the values.
+	// The resulting boundaries are guaranteed to both contain at least
+	// num_boundaries unique elements and maintain approximation bounds.
 	output := []float64{}
 	if len(sum.entries) == 0 {
 		return output
 	}
 
 	// Generate soft compressed summary.
-	compressedSummary := &WeightedQuantilesSummary{}
+	compressedSummary := &Summary{}
 	compressedSummary.BuildFromSummaryEntries(sum.entries)
 	// Set an epsilon for compression that's at most 1.0 / num_boundaries
 	// more than epsilon of original our summary since the compression operation
@@ -220,7 +217,11 @@ func (sum *WeightedQuantilesSummary) GenerateBoundaries(numBoundaries int64) []f
 }
 
 // GenerateQuantiles ...
-func (sum *WeightedQuantilesSummary) GenerateQuantiles(numQuantiles int64) []float64 {
+func (sum *Summary) GenerateQuantiles(numQuantiles int64) []float64 {
+	// To construct the desired n-quantiles we repetitively query n ranks from the
+	// original summary. The following algorithm is an efficient cache-friendly
+	// O(n) implementation of that idea which avoids the cost of the repetitive
+	// full rank queries O(nlogn).
 	output := []float64{}
 	if len(sum.entries) == 0 {
 		return output
@@ -247,7 +248,7 @@ func (sum *WeightedQuantilesSummary) GenerateQuantiles(numQuantiles int64) []flo
 }
 
 // ApproximationError ...
-func (sum *WeightedQuantilesSummary) ApproximationError() float64 {
+func (sum *Summary) ApproximationError() float64 {
 	if len(sum.entries) == 0 {
 		return 0
 	}
@@ -266,7 +267,7 @@ func (sum *WeightedQuantilesSummary) ApproximationError() float64 {
 }
 
 // MinValue ...
-func (sum *WeightedQuantilesSummary) MinValue() float64 {
+func (sum *Summary) MinValue() float64 {
 	if len(sum.entries) != 0 {
 		return sum.entries[0].value
 	}
@@ -274,7 +275,7 @@ func (sum *WeightedQuantilesSummary) MinValue() float64 {
 }
 
 // MaxValue ...
-func (sum *WeightedQuantilesSummary) MaxValue() float64 {
+func (sum *Summary) MaxValue() float64 {
 	if len(sum.entries) != 0 {
 		return sum.entries[len(sum.entries)-1].value
 	}
@@ -282,7 +283,7 @@ func (sum *WeightedQuantilesSummary) MaxValue() float64 {
 }
 
 // TotalWeight ...
-func (sum *WeightedQuantilesSummary) TotalWeight() float64 {
+func (sum *Summary) TotalWeight() float64 {
 	if len(sum.entries) != 0 {
 		return sum.entries[len(sum.entries)-1].maxRank
 	}
@@ -290,11 +291,11 @@ func (sum *WeightedQuantilesSummary) TotalWeight() float64 {
 }
 
 // Size ...
-func (sum *WeightedQuantilesSummary) Size() int64 {
+func (sum *Summary) Size() int64 {
 	return int64(len(sum.entries))
 }
 
 // Clear ...
-func (sum *WeightedQuantilesSummary) Clear() {
-	sum.entries = []*SummaryEntry{}
+func (sum *Summary) Clear() {
+	sum.entries = []*sumEntry{}
 }
