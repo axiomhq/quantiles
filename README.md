@@ -14,7 +14,7 @@ This implementation is an adaptation of techniques from the following papers:
 * Two base operations are defined: `MERGE` and `COMPRESS`. `MERGE` combines two
   summaries guaranteeing a `epsNew = max(eps1, eps2)`. `COMPRESS` compresses
   a summary to `b + 1` elements guaranteeing `epsNew = epsOld + 1/b`.
-* b * sizeof(summary entry) must ideally be small enough to fit in an
+* `b * sizeof(summary entry)` must ideally be small enough to fit in an
   average CPU L2 cache.
 * To distribute this algorithm with maintaining error bounds, we need
   the worker-computed summaries to have no more than `eps / h` error
