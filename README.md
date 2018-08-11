@@ -33,7 +33,7 @@ therefore, is disallowed.
 
 
 ## TODO
-* [ ] Implement an online estimator without the need of finalizing the stream.
-* [ ] Add proper documentation.
+* [ ] Implement an online estimator without the need of finalizing the stream
+* [ ] Add proper documentation
 * [ ] Benchmark
 * [ ] Add serialization
