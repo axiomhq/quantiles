@@ -9,7 +9,7 @@ This implementation is an adaptation of techniques from the following papers:
 
 ### The key ideas at play are the following:
 * Maintain an in-memory multi-level quantile summary in a way to guarantee
-  a maximum approximation error of eps * W per bucket where W is the total
+  a maximum approximation error of `eps * W` per bucket where `W` is the total
   weight across all points in the input dataset.
 * Two base operations are defined: `MERGE` and `COMPRESS`. `MERGE` combines two
   summaries guaranteeing a `epsNew = max(eps1, eps2)`. `COMPRESS` compresses
