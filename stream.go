@@ -5,19 +5,19 @@ import (
 	"math"
 )
 
-// WeightedQuantilesStream ...
-type WeightedQuantilesStream struct {
+// Stream ...
+type Stream struct {
 	eps           float64
 	maxLevels     int64
 	blockSize     int64
-	buffer        *WeightedQuantilesBuffer
-	localSummary  *WeightedQuantilesSummary
-	summaryLevels []*WeightedQuantilesSummary
+	buffer        *buffer
+	localSummary  *Summary
+	summaryLevels []*Summary
 	finalized     bool
 }
 
-// NewWeightedQuantilesStream ...
-func NewWeightedQuantilesStream(eps float64, maxElements int64) (*WeightedQuantilesStream, error) {
+// New ...
+func New(eps float64, maxElements int64) (*Stream, error) {
 	if eps <= 0 {
 		return nil, fmt.Errorf("an epsilon value of zero is not allowed")
 	}
@@ -27,80 +27,80 @@ func NewWeightedQuantilesStream(eps float64, maxElements int64) (*WeightedQuanti
 		return nil, err
 	}
 
-	buffer, err := NewWeightedQuantilesBuffer(blockSize, maxElements)
+	buffer, err := newBuffer(blockSize, maxElements)
 	if err != nil {
 		return nil, err
 	}
 
-	stream := &WeightedQuantilesStream{
+	stream := &Stream{
 		eps:           eps,
 		buffer:        buffer,
 		finalized:     false,
 		maxLevels:     maxLevels,
 		blockSize:     blockSize,
-		localSummary:  NewWeightedQuantilesSummary(),
-		summaryLevels: []*WeightedQuantilesSummary{},
+		localSummary:  newSummary(),
+		summaryLevels: []*Summary{},
 	}
 	return stream, nil
 }
 
-// PushEntry ...
-func (wqs *WeightedQuantilesStream) PushEntry(value float64, weight float64) error {
+// Push ...
+func (stream *Stream) Push(value float64, weight float64) error {
 	// Validate state.
 	var err error
-	if wqs.finalized {
+	if stream.finalized {
 		return fmt.Errorf("Finalize() already called")
 	}
 
-	if err = wqs.buffer.PushEntry(value, weight); err != nil {
+	if err = stream.buffer.push(value, weight); err != nil {
 		return err
 	}
 
-	if wqs.buffer.IsFull() {
-		err = wqs.PushBuffer(wqs.buffer)
+	if stream.buffer.isFull() {
+		err = stream.pushBuffer(stream.buffer)
 	}
 	return err
 }
 
-// PushBuffer ...
-func (wqs *WeightedQuantilesStream) PushBuffer(buffer *WeightedQuantilesBuffer) error {
+func (stream *Stream) pushBuffer(buf *buffer) error {
 	// Validate state.
-	if wqs.finalized {
+	if stream.finalized {
 		return fmt.Errorf("Finalize() already called")
 	}
-	wqs.localSummary.BuildFromBufferEntries(wqs.buffer.GenerateEntryList())
-	wqs.localSummary.Compress(wqs.blockSize, wqs.eps)
-	return wqs.propagateLocalSummary()
+	stream.localSummary.buildFromBufferEntries(buf.generateEntryList())
+	stream.localSummary.Compress(stream.blockSize, stream.eps)
+	return stream.propagateLocalSummary()
 }
 
 // PushSummary pushes full summary while maintaining approximation error invariants.
-func (wqs *WeightedQuantilesStream) PushSummary(summary []*SummaryEntry) error {
+func (stream *Stream) PushSummary(summary []*SumEntry) error {
 	// Validate state.
-	if wqs.finalized {
+	if stream.finalized {
 		return fmt.Errorf("Finalize() already called")
 	}
-	wqs.localSummary.BuildFromSummaryEntries(summary)
-	wqs.localSummary.Compress(wqs.blockSize, wqs.eps)
-	return wqs.propagateLocalSummary()
+	stream.localSummary.BuildFromSummaryEntries(summary)
+	stream.localSummary.Compress(stream.blockSize, stream.eps)
+	return stream.propagateLocalSummary()
 }
 
 // Finalize flushes approximator and finalizes state.
-func (wqs *WeightedQuantilesStream) Finalize() error {
+func (stream *Stream) Finalize() error {
 	// Validate state.
-	if wqs.finalized {
+	if stream.finalized {
 		return fmt.Errorf("Finalize() already called")
 	}
+
 	// Flush any remaining buffer elements.
-	wqs.PushBuffer(wqs.buffer)
+	stream.pushBuffer(stream.buffer)
 
 	// Create final merged summary
-	wqs.localSummary.Clear()
-	for _, summary := range wqs.summaryLevels {
-		wqs.localSummary.Merge(summary)
+	stream.localSummary.Clear()
+	for _, summary := range stream.summaryLevels {
+		stream.localSummary.Merge(summary)
 	}
 
-	wqs.summaryLevels = []*WeightedQuantilesSummary{}
-	wqs.finalized = true
+	stream.summaryLevels = []*Summary{}
+	stream.finalized = true
 	return nil
 }
 
@@ -108,38 +108,38 @@ func (wqs *WeightedQuantilesStream) Finalize() error {
 propagates local summary through summary levels while maintaining
 approximation error invariants.
 */
-func (wqs *WeightedQuantilesStream) propagateLocalSummary() error {
+func (stream *Stream) propagateLocalSummary() error {
 	// Validate state.
-	if wqs.finalized {
+	if stream.finalized {
 		return fmt.Errorf("Finalize() already called")
 	}
 
 	// No-op if there's nothing to add.
-	if wqs.localSummary.Size() <= 0 {
+	if stream.localSummary.Size() <= 0 {
 		return nil
 	}
 
 	var level int64
 	for settled := false; !settled; level++ {
 		// Ensure we have enough depth.
-		if int64(len(wqs.summaryLevels)) <= level {
-			wqs.summaryLevels = append(wqs.summaryLevels, &WeightedQuantilesSummary{})
+		if int64(len(stream.summaryLevels)) <= level {
+			stream.summaryLevels = append(stream.summaryLevels, &Summary{})
 		}
 
 		// Merge summaries.
-		currentSummary := wqs.summaryLevels[level]
-		wqs.localSummary.Merge(currentSummary)
+		currentSummary := stream.summaryLevels[level]
+		stream.localSummary.Merge(currentSummary)
 
 		// Check if we need to compress and propagate summary higher.
 		if currentSummary.Size() == 0 ||
-			wqs.localSummary.Size() <= wqs.blockSize+1 {
-			*currentSummary = *(wqs.localSummary)
-			wqs.localSummary = NewWeightedQuantilesSummary()
+			stream.localSummary.Size() <= stream.blockSize+1 {
+			*currentSummary = *(stream.localSummary)
+			stream.localSummary = newSummary()
 			settled = true
 
 		} else {
 			// Compress, empty current level and propagate.
-			wqs.localSummary.Compress(wqs.blockSize, wqs.eps)
+			stream.localSummary.Compress(stream.blockSize, stream.eps)
 			currentSummary.Clear()
 		}
 	}
@@ -151,11 +151,11 @@ GenerateQuantiles generates requested number of quantiles after finalizing strea
 The returned quantiles can be queried using std::lower_bound to get
 the bucket for a given value.
 */
-func (wqs *WeightedQuantilesStream) GenerateQuantiles(numQuantiles int64) ([]float64, error) {
-	if !wqs.finalized {
+func (stream *Stream) GenerateQuantiles(numQuantiles int64) ([]float64, error) {
+	if !stream.finalized {
 		return nil, fmt.Errorf("Finalize() must be called before generating quantiles")
 	}
-	return wqs.localSummary.GenerateQuantiles(numQuantiles), nil
+	return stream.localSummary.GenerateQuantiles(numQuantiles), nil
 }
 
 /*
@@ -168,11 +168,11 @@ Boundaries are preferable over quantiles when the caller is less
 interested in the actual quantiles distribution and more interested in
 getting a representative sample of boundary values.
 */
-func (wqs *WeightedQuantilesStream) GenerateBoundaries(numBoundaries int64) ([]float64, error) {
-	if !wqs.finalized {
+func (stream *Stream) GenerateBoundaries(numBoundaries int64) ([]float64, error) {
+	if !stream.finalized {
 		return nil, fmt.Errorf("Finalize() must be called before generating quantiles")
 	}
-	return wqs.localSummary.GenerateBoundaries(numBoundaries), nil
+	return stream.localSummary.GenerateBoundaries(numBoundaries), nil
 }
 
 /*
@@ -181,15 +181,15 @@ If the passed level is negative, the approximation error for the entire
 summary is returned. Note that after Finalize is called, only the overall
 error is available.
 */
-func (wqs *WeightedQuantilesStream) ApproximationError(level int64) (float64, error) {
-	if wqs.finalized {
+func (stream *Stream) ApproximationError(level int64) (float64, error) {
+	if stream.finalized {
 		if level > 0 {
 			return 0, fmt.Errorf("only overall error is available after Finalize()")
 		}
-		return wqs.localSummary.ApproximationError(), nil
+		return stream.localSummary.ApproximationError(), nil
 	}
 
-	if len(wqs.summaryLevels) == 0 {
+	if len(stream.summaryLevels) == 0 {
 		// No error even if base buffer isn't empty.
 		return 0, nil
 	}
@@ -198,28 +198,32 @@ func (wqs *WeightedQuantilesStream) ApproximationError(level int64) (float64, er
 	// for the top-most level which is the max approximation error
 	// in all summaries by construction.
 	if level < 0 {
-		level = int64(len(wqs.summaryLevels)) - 1
+		level = int64(len(stream.summaryLevels)) - 1
 	}
-	if level >= int64(len(wqs.summaryLevels)) {
+	if level >= int64(len(stream.summaryLevels)) {
 		return 0, fmt.Errorf("invalid level")
 	}
-	return wqs.summaryLevels[level].ApproximationError(), nil
+	return stream.summaryLevels[level].ApproximationError(), nil
 }
 
 // MaxDepth ...
-func (wqs *WeightedQuantilesStream) MaxDepth() int {
-	return len(wqs.summaryLevels)
+func (stream *Stream) MaxDepth() int {
+	return len(stream.summaryLevels)
 }
 
-// GetFinalSummary ...
-func (wqs *WeightedQuantilesStream) GetFinalSummary() (*WeightedQuantilesSummary, error) {
-	if !wqs.finalized {
+// FinalSummary ...
+func (stream *Stream) FinalSummary() (*Summary, error) {
+	if !stream.finalized {
 		return nil, fmt.Errorf("Finalize() must be called before generating quantiles")
 	}
-	return wqs.localSummary, nil
+	return stream.localSummary, nil
 }
 
-// GetQuantileSpecs ...
+/*
+Helper method which, given the desired approximation error
+and an upper bound on the number of elements, computes the optimal
+number of levels and block size and returns them in the tuple.
+*/
 func getQuantileSpecs(eps float64, maxElements int64) (int64, int64, error) {
 	var (
 		maxLevel  int64 = 1

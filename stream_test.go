@@ -52,10 +52,10 @@ func TestNonZeroEps(t *testing.T) {
 	assert.Equal(tup, tuple{26, 25001})
 }
 
-func generateFixedUniformSummary(workerID int32, maxElements int64, totalWeight *float64, stream *WeightedQuantilesStream) error {
+func generateFixedUniformSummary(workerID int32, maxElements int64, totalWeight *float64, stream *Stream) error {
 	for i := int64(0); i < maxElements; i++ {
 		x := float64(i) / float64(maxElements)
-		if err := stream.PushEntry(x, 1); err != nil {
+		if err := stream.Push(x, 1); err != nil {
 			return err
 		}
 		*totalWeight++
@@ -63,42 +63,42 @@ func generateFixedUniformSummary(workerID int32, maxElements int64, totalWeight 
 	return stream.Finalize()
 }
 
-func generateFixedNonUniformSummary(workerID int32, maxElements int64, totalWeight *float64, stream *WeightedQuantilesStream) error {
-	for i := int64(0); i < maxElements; i++ {
-		x := float64(i) / float64(maxElements)
-		stream.PushEntry(x, x)
-		*totalWeight += x
-	}
-	return stream.Finalize()
-}
-
-func generateRandUniformFixedWeightsSummary(workerID int32, maxElements int64, totalWeight *float64, stream *WeightedQuantilesStream) error {
+func generateRandUniformFixedWeightsSummary(workerID int32, maxElements int64, totalWeight *float64, stream *Stream) error {
 	for i := int64(0); i < maxElements; i++ {
 		x := rand.Float64()
-		stream.PushEntry(x, 1)
+		stream.Push(x, 1)
 		*totalWeight++
 	}
 	return stream.Finalize()
 }
 
-func generateRandUniformRandWeightsSummary(workerID int32, maxElements int64, totalWeight *float64, stream *WeightedQuantilesStream) error {
+func generateFixedNonUniformSummary(workerID int32, maxElements int64, totalWeight *float64, stream *Stream) error {
+	for i := int64(0); i < maxElements; i++ {
+		x := float64(i) / float64(maxElements)
+		stream.Push(x, x)
+		*totalWeight += x
+	}
+	return stream.Finalize()
+}
+
+func generateRandUniformRandWeightsSummary(workerID int32, maxElements int64, totalWeight *float64, stream *Stream) error {
 	for i := int64(0); i < maxElements; i++ {
 		x := rand.Float64()
 		w := rand.Float64()
-		stream.PushEntry(x, w)
+		stream.Push(x, w)
 		*totalWeight += w
 	}
 	return stream.Finalize()
 }
 
-type workerSummaryGeneratorFunc func(int32, int64, *float64, *WeightedQuantilesStream) error
+type workerSummaryGeneratorFunc func(int32, int64, *float64, *Stream) error
 
 func testSingleWorkerStreams(t *testing.T, eps float64, maxElements int64,
 	workerSummaryGenerator workerSummaryGeneratorFunc,
 	expectedQuantiles []float64, quantilesMatcherEpsilon float64) {
 
 	totalWeight := 0.0
-	stream, err := NewWeightedQuantilesStream(eps, maxElements)
+	stream, err := New(eps, maxElements)
 	if err != nil {
 		t.Error("expected no error, got ", err)
 		return
@@ -118,7 +118,7 @@ func testSingleWorkerStreams(t *testing.T, eps float64, maxElements int64,
 		return
 	}
 
-	sum, err := stream.GetFinalSummary()
+	sum, err := stream.FinalSummary()
 	if err != nil {
 		t.Error("expected no error, got ", err)
 		return
@@ -144,15 +144,15 @@ func testSingleWorkerStreams(t *testing.T, eps float64, maxElements int64,
 }
 
 // Stream generators.
-func generateOneValue(workerID int32, maxElements int64, totalWeight *float64, stream *WeightedQuantilesStream) error {
-	stream.PushEntry(10, 1)
+func generateOneValue(workerID int32, maxElements int64, totalWeight *float64, stream *Stream) error {
+	stream.Push(10, 1)
 	*totalWeight++
 	return stream.Finalize()
 }
 
 // Stream generators.
-func generateOneZeroWeightedValue(workerID int32, maxElements int64, totalWeight *float64, stream *WeightedQuantilesStream) error {
-	stream.PushEntry(10, 0)
+func generateOneZeroWeightedValue(workerID int32, maxElements int64, totalWeight *float64, stream *Stream) error {
+	stream.Push(10, 0)
 	return stream.Finalize()
 }
 
@@ -217,15 +217,15 @@ func testDistributedStreams(t *testing.T, numWorkers int32, eps float64, maxElem
 
 	// Simulate streams on each worker running independently
 	totalWeight := 0.0
-	workerSummaries := [][]*SummaryEntry{}
+	workerSummaries := [][]*SumEntry{}
 	for i := int32(0); i < numWorkers; i++ {
-		stream, err := NewWeightedQuantilesStream(eps/2, maxElements)
+		stream, err := New(eps/2, maxElements)
 		if err != nil {
 			t.Error("expected no error, got", err)
 			return
 		}
 		workerSummaryGenerator(i, maxElements/int64(numWorkers), &totalWeight, stream)
-		sum, err := stream.GetFinalSummary()
+		sum, err := stream.FinalSummary()
 		if err != nil {
 			t.Error("expected no error, got ", err)
 			return
@@ -236,7 +236,7 @@ func testDistributedStreams(t *testing.T, numWorkers int32, eps float64, maxElem
 	// In the accumulation phase, we aggregate the summaries from each worker
 	// and build an overall summary while maintaining error bounds by ensuring we
 	// don't increase the error by more than eps / 2.
-	reducerStream, err := NewWeightedQuantilesStream(eps, maxElements)
+	reducerStream, err := New(eps, maxElements)
 	if err != nil {
 		t.Error("expected no error, got ", err)
 		return
@@ -262,7 +262,7 @@ func testDistributedStreams(t *testing.T, numWorkers int32, eps float64, maxElem
 		return
 	}
 
-	sum, err := reducerStream.GetFinalSummary()
+	sum, err := reducerStream.FinalSummary()
 	if err != nil {
 		t.Error("expected no error, got ", err)
 		return

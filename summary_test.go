@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type WeightedQuantilesSummaryDummy struct {
-	buffer1 *WeightedQuantilesBuffer
-	buffer2 *WeightedQuantilesBuffer
+type SummaryDummy struct {
+	buffer1 *buffer
+	buffer2 *buffer
 
 	buffer1MinValue    float64
 	buffer1MaxValue    float64
@@ -19,21 +19,21 @@ type WeightedQuantilesSummaryDummy struct {
 	buffer2MaxValue    float64
 	buffer2TotalWeight float64
 
-	*WeightedQuantilesSummary
+	*Summary
 }
 
-func NewWeightedQuantilesSummaryDummy() (*WeightedQuantilesSummaryDummy, error) {
-	sum := &WeightedQuantilesSummary{
-		entries: make([]*SummaryEntry, 0),
+func NewWeightedQuantilesSummaryDummy() (*SummaryDummy, error) {
+	sum := &Summary{
+		entries: make([]*SumEntry, 0),
 	}
-	wqsd := &WeightedQuantilesSummaryDummy{
-		WeightedQuantilesSummary: sum,
-		buffer1MinValue:          -13,
-		buffer1MaxValue:          21,
-		buffer1TotalWeight:       45,
-		buffer2MinValue:          -7,
-		buffer2MaxValue:          11,
-		buffer2TotalWeight:       30,
+	wqsd := &SummaryDummy{
+		Summary:            sum,
+		buffer1MinValue:    -13,
+		buffer1MaxValue:    21,
+		buffer1TotalWeight: 45,
+		buffer2MinValue:    -7,
+		buffer2MaxValue:    11,
+		buffer2TotalWeight: 30,
 	}
 	if err := wqsd.setup(); err != nil {
 		return nil, err
@@ -41,9 +41,9 @@ func NewWeightedQuantilesSummaryDummy() (*WeightedQuantilesSummaryDummy, error) 
 	return wqsd, nil
 }
 
-func (wqsd *WeightedQuantilesSummaryDummy) setup() error {
+func (wqsd *SummaryDummy) setup() error {
 	var err error
-	wqsd.buffer1, err = NewWeightedQuantilesBuffer(10, 1000)
+	wqsd.buffer1, err = newBuffer(10, 1000)
 	if err != nil {
 		return err
 	}
@@ -59,12 +59,12 @@ func (wqsd *WeightedQuantilesSummaryDummy) setup() error {
 		[2]float64{8, 2},
 		[2]float64{-5, 6},
 	} {
-		if err := wqsd.buffer1.PushEntry(val[0], val[1]); err != nil {
+		if err := wqsd.buffer1.push(val[0], val[1]); err != nil {
 			return err
 		}
 	}
 
-	wqsd.buffer2, err = NewWeightedQuantilesBuffer(7, 1000)
+	wqsd.buffer2, err = newBuffer(7, 1000)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (wqsd *WeightedQuantilesSummaryDummy) setup() error {
 		[2]float64{-5, 3},
 		[2]float64{11, 3},
 	} {
-		if err := wqsd.buffer2.PushEntry(val[0], val[1]); err != nil {
+		if err := wqsd.buffer2.push(val[0], val[1]); err != nil {
 			return err
 		}
 	}
@@ -89,8 +89,8 @@ func TestSummaryBuildFromBuffer(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sum := &WeightedQuantilesSummary{}
-	sum.BuildFromBufferEntries(wqsd.buffer1.GenerateEntryList())
+	sum := &Summary{}
+	sum.buildFromBufferEntries(wqsd.buffer1.generateEntryList())
 
 	// We expect no approximation error because no compress operation occurred.
 	if approx := sum.ApproximationError(); approx != 0 {
@@ -105,8 +105,8 @@ func TestSummaryBuildFromBuffer(t *testing.T) {
 		t.Error("first element's rmin should be zero, got", val)
 	}
 	// EXPECT_EQ(entries.front(), SummaryEntry(-13, 4, 0, 4))
-	exp := SummaryEntry{
-		value: -13, weight: 4, minRank: 0, maxRank: 4,
+	exp := SumEntry{
+		Value: -13, Weight: 4, MinRank: 0, MaxRank: 4,
 	}
 	if val := entries[0]; *val != exp {
 		t.Errorf("expected %v, got %v", exp, val)
@@ -119,8 +119,8 @@ func TestSummaryBuildFromBuffer(t *testing.T) {
 	}
 
 	//EXPECT_EQ(entries.back(), SummaryEntry(21, 8, 37, 45))
-	exp = SummaryEntry{
-		value: 21, weight: 8, minRank: 37, maxRank: 45,
+	exp = SumEntry{
+		Value: 21, Weight: 8, MinRank: 37, MaxRank: 45,
 	}
 	if val := entries[len(entries)-1]; *val != exp {
 		t.Errorf("expected %v, got %v", exp, val)
@@ -138,10 +138,10 @@ func TestSummaryCompressSeparately(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	entryList := wqsd.buffer1.GenerateEntryList()
+	entryList := wqsd.buffer1.generateEntryList()
 	for newSize := int64(9); newSize >= 2; newSize-- {
-		sum := &WeightedQuantilesSummary{}
-		sum.BuildFromBufferEntries(entryList)
+		sum := &Summary{}
+		sum.buildFromBufferEntries(entryList)
 		sum.Compress(newSize, 0)
 
 		// Expect a max approximation error of 1 / n
@@ -179,9 +179,9 @@ func TestSummaryCompressSequentially(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	entryList := wqsd.buffer1.GenerateEntryList()
-	sum := &WeightedQuantilesSummary{}
-	sum.BuildFromBufferEntries(entryList)
+	entryList := wqsd.buffer1.generateEntryList()
+	sum := &Summary{}
+	sum.buildFromBufferEntries(entryList)
 	for newSize := int64(9); newSize >= 2; newSize -= 2 {
 
 		prevEps := sum.ApproximationError()
@@ -230,19 +230,19 @@ func TestSummaryCompressRandomized(t *testing.T) {
 	)
 
 	for size < (1 << 16) {
-		buffer, err := NewWeightedQuantilesBuffer(size, size<<4)
+		buffer, err := newBuffer(size, size<<4)
 		if err != nil {
 			t.Error("expected no error, got", err)
 		}
 		for i := int64(0); i < size; i++ {
-			buffer.PushEntry(
+			buffer.push(
 				rand.Float64()*maxValue,
 				rand.Float64()*maxValue,
 			)
 		}
 
-		sum := &WeightedQuantilesSummary{}
-		sum.BuildFromBufferEntries(wqsd.buffer1.GenerateEntryList())
+		sum := &Summary{}
+		sum.buildFromBufferEntries(wqsd.buffer1.generateEntryList())
 		newSize := maxInt64(rand.Int63n(size), 2)
 		sum.Compress(newSize, 0)
 
@@ -272,12 +272,12 @@ func TestSummaryMergeSymmetry(t *testing.T) {
 		t.Error(err)
 	}
 
-	list1 := wqsd.buffer1.GenerateEntryList()
-	list2 := wqsd.buffer2.GenerateEntryList()
-	sum1 := &WeightedQuantilesSummary{}
-	sum1.BuildFromBufferEntries(list1)
-	sum2 := &WeightedQuantilesSummary{}
-	sum2.BuildFromBufferEntries(list2)
+	list1 := wqsd.buffer1.generateEntryList()
+	list2 := wqsd.buffer2.generateEntryList()
+	sum1 := &Summary{}
+	sum1.buildFromBufferEntries(list1)
+	sum2 := &Summary{}
+	sum2.buildFromBufferEntries(list2)
 
 	sum1.Merge(sum2)
 	assert.Equal(sum1.ApproximationError(), 0.0)
@@ -290,7 +290,7 @@ func TestSummaryMergeSymmetry(t *testing.T) {
 		wqsd.buffer1TotalWeight+wqsd.buffer2TotalWeight)
 	assert.Equal(sum1.Size(), int64(14))
 
-	sum1.BuildFromBufferEntries(list1)
+	sum1.buildFromBufferEntries(list1)
 	sum2.Merge(sum1)
 	assert.Equal(sum2.ApproximationError(), 0.0)
 	assert.Equal(sum2.MinValue(),
@@ -309,10 +309,10 @@ func TestSummaryCompressThenMerge(t *testing.T) {
 		t.Error(err)
 	}
 
-	sum1 := &WeightedQuantilesSummary{}
-	sum1.BuildFromBufferEntries(wqsd.buffer1.GenerateEntryList())
-	sum2 := &WeightedQuantilesSummary{}
-	sum2.BuildFromBufferEntries(wqsd.buffer2.GenerateEntryList())
+	sum1 := &Summary{}
+	sum1.buildFromBufferEntries(wqsd.buffer1.generateEntryList())
+	sum2 := &Summary{}
+	sum2.buildFromBufferEntries(wqsd.buffer2.generateEntryList())
 
 	sum1.Compress(5, 0)
 	eps1 := 1.0 / 5
