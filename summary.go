@@ -16,10 +16,6 @@ func (se sumEntry) nextMinRank() float64 {
 	return se.minRank + se.weight
 }
 
-func compFn(a, b *sumEntry) bool {
-	return a.value < b.value
-}
-
 // Summary ...
 type Summary struct {
 	entries []*sumEntry
