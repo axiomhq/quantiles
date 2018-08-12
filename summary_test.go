@@ -218,11 +218,6 @@ func TestSummaryCompressSequentially(t *testing.T) {
 }
 
 func TestSummaryCompressRandomized(t *testing.T) {
-	wqsd, err := NewWeightedQuantilesSummaryDummy()
-	if err != nil {
-		t.Error(err)
-	}
-
 	var (
 		prevSize int64 = 1
 		size     int64 = 2
@@ -242,7 +237,7 @@ func TestSummaryCompressRandomized(t *testing.T) {
 		}
 
 		sum := &Summary{}
-		sum.buildFromBufferEntries(wqsd.buffer1.generateEntryList())
+		sum.buildFromBufferEntries(buffer.generateEntryList())
 		newSize := maxInt64(rand.Int63n(size), 2)
 		sum.Compress(newSize, 0)
 
