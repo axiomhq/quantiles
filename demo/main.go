@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/seiflotfy/quantiles"
+	"github.com/axiomhq/quantiles"
 )
 
 func main() {

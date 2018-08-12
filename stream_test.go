@@ -52,8 +52,6 @@ func TestNonZeroEps(t *testing.T) {
 	assert.Equal(tup, tuple{26, 25001})
 }
 
-type WeightedQuantilesStreamDummy Stream
-
 func generateFixedUniformSummary(workerID int32, maxElements int64, totalWeight *float64, stream *Stream) error {
 	for i := int64(0); i < maxElements; i++ {
 		x := float64(i) / float64(maxElements)
@@ -70,15 +68,6 @@ func generateFixedNonUniformSummary(workerID int32, maxElements int64, totalWeig
 		x := float64(i) / float64(maxElements)
 		stream.Push(x, x)
 		*totalWeight += x
-	}
-	return stream.Finalize()
-}
-
-func generateRandUniformFixedWeightsSummary(workerID int32, maxElements int64, totalWeight *float64, stream *Stream) error {
-	for i := int64(0); i < maxElements; i++ {
-		x := rand.Float64()
-		stream.Push(x, 1)
-		*totalWeight++
 	}
 	return stream.Finalize()
 }
