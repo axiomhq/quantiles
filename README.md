@@ -33,7 +33,7 @@ therefore, is disallowed.
 
 
 ## Example Usage
-```
+```go
 package quantiles_test
 
 import (
