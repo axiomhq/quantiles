@@ -44,6 +44,31 @@ func New(eps float64, maxElements int64) (*Stream, error) {
 	return stream, nil
 }
 
+func (stream *Stream) clone() *Stream {
+	newStream := &Stream{
+		eps:           stream.eps,
+		buffer:        stream.buffer.clone(),
+		finalized:     stream.finalized,
+		maxLevels:     stream.maxLevels,
+		blockSize:     stream.blockSize,
+		localSummary:  stream.localSummary.clone(),
+		summaryLevels: stream.summaryLevels,
+	}
+	for i, sum := range stream.summaryLevels {
+		newStream.summaryLevels[i] = sum.clone()
+	}
+	return newStream
+}
+
+// QuickQuantiles ...
+func (stream *Stream) QuickQuantiles(numQuantiles int64) ([]float64, error) {
+	tmpStream := stream.clone()
+	if err := tmpStream.Finalize(); err != nil {
+		return nil, err
+	}
+	return tmpStream.GenerateQuantiles(numQuantiles)
+}
+
 // Push ...
 func (stream *Stream) Push(value float64, weight float64) error {
 	// Validate state.

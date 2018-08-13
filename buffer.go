@@ -32,6 +32,11 @@ func newBuffer(blockSize, maxElements int64) (*buffer, error) {
 	}, nil
 }
 
+func (buf *buffer) clone() *buffer {
+	newBuffer := *buf
+	return &newBuffer
+}
+
 func (buf *buffer) push(value, weight float64) error {
 	//QCHECK magic
 	if buf.isFull() {

@@ -305,3 +305,8 @@ func (sum *Summary) Size() int64 {
 func (sum *Summary) Clear() {
 	sum.entries = []SumEntry{}
 }
+
+// Entries ...
+func (sum *Summary) Entries() []SumEntry {
+	return sum.entries
+}
