@@ -106,7 +106,7 @@ func TestSummaryBuildFromBuffer(t *testing.T) {
 	}
 	// EXPECT_EQ(entries.front(), SummaryEntry(-13, 4, 0, 4))
 	exp := SumEntry{
-		Value: -13, Weight: 4, MinRank: 0, MaxRank: 4,
+		value: -13, weight: 4, minRank: 0, maxRank: 4,
 	}
 	if val := entries[0]; val != exp {
 		t.Errorf("expected %v, got %v", exp, val)
@@ -120,7 +120,7 @@ func TestSummaryBuildFromBuffer(t *testing.T) {
 
 	//EXPECT_EQ(entries.back(), SummaryEntry(21, 8, 37, 45))
 	exp = SumEntry{
-		Value: 21, Weight: 8, MinRank: 37, MaxRank: 45,
+		value: 21, weight: 8, minRank: 37, maxRank: 45,
 	}
 	if val := entries[len(entries)-1]; val != exp {
 		t.Errorf("expected %v, got %v", exp, val)
@@ -142,7 +142,7 @@ func TestSummaryCompressSeparately(t *testing.T) {
 	for newSize := int64(9); newSize >= 2; newSize-- {
 		sum := &Summary{}
 		sum.buildFromBufferEntries(entryList)
-		sum.Compress(newSize, 0)
+		sum.compress(newSize, 0)
 
 		// Expect a max approximation error of 1 / n
 		// ie. eps0 + 1/n but eps0 = 0.
@@ -185,7 +185,7 @@ func TestSummaryCompressSequentially(t *testing.T) {
 	for newSize := int64(9); newSize >= 2; newSize -= 2 {
 
 		prevEps := sum.ApproximationError()
-		sum.Compress(newSize, 0)
+		sum.compress(newSize, 0)
 
 		// Expect a max approximation error of prev_eps + 1 / n.
 
@@ -239,7 +239,7 @@ func TestSummaryCompressRandomized(t *testing.T) {
 		sum := &Summary{}
 		sum.buildFromBufferEntries(buffer.generateEntryList())
 		newSize := maxInt64(rand.Int63n(size), 2)
-		sum.Compress(newSize, 0)
+		sum.compress(newSize, 0)
 
 		// EXPECT_TRUE(summary.Size() >= new_size && summary.Size() <= new_size + 2);
 		if val := sum.Size(); val < newSize {
@@ -309,13 +309,13 @@ func TestSummaryCompressThenMerge(t *testing.T) {
 	sum2 := &Summary{}
 	sum2.buildFromBufferEntries(wqsd.buffer2.generateEntryList())
 
-	sum1.Compress(5, 0)
+	sum1.compress(5, 0)
 	eps1 := 1.0 / 5
 	// EXPECT_LE(summary.ApproximationError(), 1.0 / new_size);
 	if approx := sum1.ApproximationError(); approx > eps1 {
 		t.Errorf("expected approx <= newSize, got %v > %v", approx, eps1)
 	}
-	sum2.Compress(3, 0)
+	sum2.compress(3, 0)
 	eps2 := 1.0 / 3
 	// EXPECT_LE(summary.ApproximationError(), 1.0 / new_size);
 	if approx := sum1.ApproximationError(); approx > eps1 {

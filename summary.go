@@ -1,22 +1,42 @@
 package quantiles
 
-// SumEntry ...
+// SumEntry represents a summary entry
 type SumEntry struct {
-	Value   float64
-	Weight  float64
-	MinRank float64
-	MaxRank float64
+	value   float64
+	weight  float64
+	minRank float64
+	maxRank float64
+}
+
+// Value returns the entries value
+func (se SumEntry) Value() float64 {
+	return se.value
+}
+
+// Weight returns the entries weight
+func (se SumEntry) Weight() float64 {
+	return se.weight
+}
+
+// MaxRank returns the entries maximum rank
+func (se SumEntry) MaxRank() float64 {
+	return se.maxRank
+}
+
+// MinRank returns the entries minimum rank
+func (se SumEntry) MinRank() float64 {
+	return se.minRank
 }
 
 func (se SumEntry) prevMaxRank() float64 {
-	return se.MaxRank - se.Weight
+	return se.maxRank - se.weight
 }
 
 func (se SumEntry) nextMinRank() float64 {
-	return se.MinRank + se.Weight
+	return se.minRank + se.weight
 }
 
-// Summary ...
+// Summary is a summarizes the stream entries
 type Summary struct {
 	entries []SumEntry
 }
@@ -38,40 +58,37 @@ func (sum *Summary) clone() *Summary {
 	return newSum
 }
 
-// buildFromBufferEntries ...
 func (sum *Summary) buildFromBufferEntries(bes []bufEntry) {
 	sum.entries = []SumEntry{}
-	// TODO: entries_.reserve(buffer_entries.size());
 	cumWeight := 0.0
 	for _, entry := range bes {
 		curWeight := entry.weight
 		se := SumEntry{
-			Value:   entry.value,
-			Weight:  entry.weight,
-			MinRank: cumWeight,
-			MaxRank: cumWeight + curWeight,
+			value:   entry.value,
+			weight:  entry.weight,
+			minRank: cumWeight,
+			maxRank: cumWeight + curWeight,
 		}
 		sum.entries = append(sum.entries, se)
 		cumWeight += curWeight
 	}
 }
 
-// BuildFromSummaryEntries ...
-func (sum *Summary) BuildFromSummaryEntries(ses []SumEntry) {
+func (sum *Summary) buildFromSummaryEntries(ses []SumEntry) {
 	sum.entries = make([]SumEntry, len(ses))
 	for i, entry := range ses {
 		sum.entries[i] = entry
 	}
 }
 
-// Merge ...
+// Merge another summary into the this summary (great for esimating quantiles over several streams)
 func (sum *Summary) Merge(other *Summary) {
 	otherEntries := other.entries
 	if len(otherEntries) == 0 {
 		return
 	}
 	if len(sum.entries) == 0 {
-		sum.BuildFromSummaryEntries(other.entries)
+		sum.buildFromSummaryEntries(other.entries)
 		return
 	}
 
@@ -98,27 +115,27 @@ func (sum *Summary) Merge(other *Summary) {
 	for i != len(baseEntries) && j != len(otherEntries) {
 		it1 := baseEntries[i]
 		it2 := otherEntries[j]
-		if it1.Value < it2.Value {
+		if it1.value < it2.value {
 			sum.entries = append(sum.entries, SumEntry{
-				Value: it1.Value, Weight: it1.Weight,
-				MinRank: it1.MinRank + nextMinRank2,
-				MaxRank: it1.MaxRank + it2.prevMaxRank(),
+				value: it1.value, weight: it1.weight,
+				minRank: it1.minRank + nextMinRank2,
+				maxRank: it1.maxRank + it2.prevMaxRank(),
 			})
 			nextMinRank1 = it1.nextMinRank()
 			i++
-		} else if it1.Value > it2.Value {
+		} else if it1.value > it2.value {
 			sum.entries = append(sum.entries, SumEntry{
-				Value: it2.Value, Weight: it2.Weight,
-				MinRank: it2.MinRank + nextMinRank1,
-				MaxRank: it2.MaxRank + it1.prevMaxRank(),
+				value: it2.value, weight: it2.weight,
+				minRank: it2.minRank + nextMinRank1,
+				maxRank: it2.maxRank + it1.prevMaxRank(),
 			})
 			nextMinRank2 = it2.nextMinRank()
 			j++
 		} else {
 			sum.entries = append(sum.entries, SumEntry{
-				Value: it1.Value, Weight: it1.Weight + it2.Weight,
-				MinRank: it1.MinRank + it2.MinRank,
-				MaxRank: it1.MaxRank + it2.MaxRank,
+				value: it1.value, weight: it1.weight + it2.weight,
+				minRank: it1.minRank + it2.minRank,
+				maxRank: it1.maxRank + it2.maxRank,
 			})
 			nextMinRank1 = it1.nextMinRank()
 			nextMinRank2 = it2.nextMinRank()
@@ -131,25 +148,24 @@ func (sum *Summary) Merge(other *Summary) {
 	for i != len(baseEntries) {
 		it1 := baseEntries[i]
 		sum.entries = append(sum.entries, SumEntry{
-			Value: it1.Value, Weight: it1.Weight,
-			MinRank: it1.MinRank + nextMinRank2,
-			MaxRank: it1.MaxRank + otherEntries[len(otherEntries)-1].MaxRank,
+			value: it1.value, weight: it1.weight,
+			minRank: it1.minRank + nextMinRank2,
+			maxRank: it1.maxRank + otherEntries[len(otherEntries)-1].maxRank,
 		})
 		i++
 	}
 	for j != len(otherEntries) {
 		it2 := otherEntries[j]
 		sum.entries = append(sum.entries, SumEntry{
-			Value: it2.Value, Weight: it2.Weight,
-			MinRank: it2.MinRank + nextMinRank1,
-			MaxRank: it2.MaxRank + baseEntries[len(baseEntries)-1].MaxRank,
+			value: it2.value, weight: it2.weight,
+			minRank: it2.minRank + nextMinRank1,
+			maxRank: it2.maxRank + baseEntries[len(baseEntries)-1].maxRank,
 		})
 		j++
 	}
 }
 
-// Compress ...
-func (sum *Summary) Compress(sizeHint int64, minEps float64) {
+func (sum *Summary) compress(sizeHint int64, minEps float64) {
 	// No-op if we're already within the size requirement.
 	sizeHint = maxInt64(sizeHint, 2)
 	if int64(len(sum.entries)) <= sizeHint {
@@ -208,21 +224,21 @@ func (sum *Summary) GenerateBoundaries(numBoundaries int64) []float64 {
 
 	// Generate soft compressed summary.
 	compressedSummary := &Summary{}
-	compressedSummary.BuildFromSummaryEntries(sum.entries)
+	compressedSummary.buildFromSummaryEntries(sum.entries)
 	// Set an epsilon for compression that's at most 1.0 / num_boundaries
 	// more than epsilon of original our summary since the compression operation
 	// adds ~1.0/num_boundaries to final approximation error.
 	compressionEps := sum.ApproximationError() + 1.0/float64(numBoundaries)
-	compressedSummary.Compress(numBoundaries, compressionEps)
+	compressedSummary.compress(numBoundaries, compressionEps)
 
 	// Return boundaries.
 	for _, entry := range compressedSummary.entries {
-		output = append(output, entry.Value)
+		output = append(output, entry.value)
 	}
 	return output
 }
 
-// GenerateQuantiles ...
+// GenerateQuantiles returns a slice of float64 of size numQuantiles+1, the ith entry is the `i * 1/numQuantiles+1` quantile
 func (sum *Summary) GenerateQuantiles(numQuantiles int64) []float64 {
 	// To construct the desired n-quantiles we repetitively query n ranks from the
 	// original summary. The following algorithm is an efficient cache-friendly
@@ -237,17 +253,17 @@ func (sum *Summary) GenerateQuantiles(numQuantiles int64) []float64 {
 	}
 	curIdx := 0
 	for rank := 0.0; rank <= float64(numQuantiles); rank++ {
-		d2 := 2 * (rank * sum.entries[len(sum.entries)-1].MaxRank / float64(numQuantiles))
+		d2 := 2 * (rank * sum.entries[len(sum.entries)-1].maxRank / float64(numQuantiles))
 		nextIdx := curIdx + 1
-		for nextIdx < len(sum.entries) && d2 >= sum.entries[nextIdx].MinRank+sum.entries[nextIdx].MaxRank {
+		for nextIdx < len(sum.entries) && d2 >= sum.entries[nextIdx].minRank+sum.entries[nextIdx].maxRank {
 			nextIdx++
 		}
 		curIdx = nextIdx - 1
 		// Determine insertion order.
 		if nextIdx == len(sum.entries) || d2 < sum.entries[curIdx].nextMinRank()+sum.entries[nextIdx].prevMaxRank() {
-			output = append(output, sum.entries[curIdx].Value)
+			output = append(output, sum.entries[curIdx].value)
 		} else {
-			output = append(output, sum.entries[nextIdx].Value)
+			output = append(output, sum.entries[nextIdx].value)
 		}
 	}
 	return output
@@ -262,7 +278,7 @@ func (sum *Summary) ApproximationError() float64 {
 	var maxGap float64
 	for i := 1; i < len(sum.entries); i++ {
 		it := sum.entries[i]
-		if tmp := it.MaxRank - it.MinRank - it.Weight; tmp > maxGap {
+		if tmp := it.maxRank - it.minRank - it.weight; tmp > maxGap {
 			maxGap = tmp
 		}
 		if tmp := it.prevMaxRank() - sum.entries[i-1].nextMinRank(); tmp > maxGap {
@@ -272,41 +288,41 @@ func (sum *Summary) ApproximationError() float64 {
 	return maxGap / sum.TotalWeight()
 }
 
-// MinValue ...
+// MinValue returns the min weight value of the summary
 func (sum *Summary) MinValue() float64 {
 	if len(sum.entries) != 0 {
-		return sum.entries[0].Value
+		return sum.entries[0].value
 	}
 	return 0
 }
 
-// MaxValue ...
+// MaxValue returns the max weight value of the summary
 func (sum *Summary) MaxValue() float64 {
 	if len(sum.entries) != 0 {
-		return sum.entries[len(sum.entries)-1].Value
+		return sum.entries[len(sum.entries)-1].value
 	}
 	return 0
 }
 
-// TotalWeight ...
+// TotalWeight returns the total weight of the summary
 func (sum *Summary) TotalWeight() float64 {
 	if len(sum.entries) != 0 {
-		return sum.entries[len(sum.entries)-1].MaxRank
+		return sum.entries[len(sum.entries)-1].maxRank
 	}
 	return 0
 }
 
-// Size ...
+// Size returns the size (num of entries) in the summary
 func (sum *Summary) Size() int64 {
 	return int64(len(sum.entries))
 }
 
-// Clear ...
+// Clear reset the summary
 func (sum *Summary) Clear() {
 	sum.entries = []SumEntry{}
 }
 
-// Entries ...
+// Entries returns all summary entries
 func (sum *Summary) Entries() []SumEntry {
 	return sum.entries
 }

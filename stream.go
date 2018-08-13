@@ -60,7 +60,7 @@ func (stream *Stream) clone() *Stream {
 	return newStream
 }
 
-// QuickQuantiles ...
+// QuickQuantiles returns current quantiles without having a final state of the stream
 func (stream *Stream) QuickQuantiles(numQuantiles int64) ([]float64, error) {
 	tmpStream := stream.clone()
 	if err := tmpStream.Finalize(); err != nil {
@@ -69,7 +69,7 @@ func (stream *Stream) QuickQuantiles(numQuantiles int64) ([]float64, error) {
 	return tmpStream.GenerateQuantiles(numQuantiles)
 }
 
-// Push ...
+// Push a value and a weight into the stream
 func (stream *Stream) Push(value float64, weight float64) error {
 	// Validate state.
 	var err error
@@ -93,7 +93,7 @@ func (stream *Stream) pushBuffer(buf *buffer) error {
 		return fmt.Errorf("Finalize() already called")
 	}
 	stream.localSummary.buildFromBufferEntries(buf.generateEntryList())
-	stream.localSummary.Compress(stream.blockSize, stream.eps)
+	stream.localSummary.compress(stream.blockSize, stream.eps)
 	return stream.propagateLocalSummary()
 }
 
@@ -103,8 +103,8 @@ func (stream *Stream) PushSummary(summary []SumEntry) error {
 	if stream.finalized {
 		return fmt.Errorf("Finalize() already called")
 	}
-	stream.localSummary.BuildFromSummaryEntries(summary)
-	stream.localSummary.Compress(stream.blockSize, stream.eps)
+	stream.localSummary.buildFromSummaryEntries(summary)
+	stream.localSummary.compress(stream.blockSize, stream.eps)
 	return stream.propagateLocalSummary()
 }
 
@@ -164,7 +164,7 @@ func (stream *Stream) propagateLocalSummary() error {
 
 		} else {
 			// Compress, empty current level and propagate.
-			stream.localSummary.Compress(stream.blockSize, stream.eps)
+			stream.localSummary.compress(stream.blockSize, stream.eps)
 			currentSummary.Clear()
 		}
 	}

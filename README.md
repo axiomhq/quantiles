@@ -82,6 +82,6 @@ func Example() {
 
 ## TODO
 * [x] Implement an online estimator without the need of finalizing the stream
-* [ ] Add proper documentation
+* [x] Add proper documentation
 * [ ] Benchmark
 * [ ] Add serialization
