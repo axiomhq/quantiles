@@ -73,7 +73,7 @@ func (stream *Stream) pushBuffer(buf *buffer) error {
 }
 
 // PushSummary pushes full summary while maintaining approximation error invariants.
-func (stream *Stream) PushSummary(summary []*SumEntry) error {
+func (stream *Stream) PushSummary(summary []SumEntry) error {
 	// Validate state.
 	if stream.finalized {
 		return fmt.Errorf("Finalize() already called")

@@ -24,7 +24,7 @@ type SummaryDummy struct {
 
 func NewWeightedQuantilesSummaryDummy() (*SummaryDummy, error) {
 	sum := &Summary{
-		entries: make([]*SumEntry, 0),
+		entries: make([]SumEntry, 0),
 	}
 	wqsd := &SummaryDummy{
 		Summary:            sum,
@@ -108,7 +108,7 @@ func TestSummaryBuildFromBuffer(t *testing.T) {
 	exp := SumEntry{
 		Value: -13, Weight: 4, MinRank: 0, MaxRank: 4,
 	}
-	if val := entries[0]; *val != exp {
+	if val := entries[0]; val != exp {
 		t.Errorf("expected %v, got %v", exp, val)
 	}
 
@@ -122,7 +122,7 @@ func TestSummaryBuildFromBuffer(t *testing.T) {
 	exp = SumEntry{
 		Value: 21, Weight: 8, MinRank: 37, MaxRank: 45,
 	}
-	if val := entries[len(entries)-1]; *val != exp {
+	if val := entries[len(entries)-1]; val != exp {
 		t.Errorf("expected %v, got %v", exp, val)
 	}
 

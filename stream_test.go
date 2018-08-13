@@ -217,7 +217,7 @@ func testDistributedStreams(t *testing.T, numWorkers int32, eps float64, maxElem
 
 	// Simulate streams on each worker running independently
 	totalWeight := 0.0
-	workerSummaries := [][]*SumEntry{}
+	workerSummaries := [][]SumEntry{}
 	for i := int32(0); i < numWorkers; i++ {
 		stream, err := New(eps/2, maxElements)
 		if err != nil {

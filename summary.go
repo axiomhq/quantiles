@@ -18,24 +18,34 @@ func (se SumEntry) nextMinRank() float64 {
 
 // Summary ...
 type Summary struct {
-	entries []*SumEntry
+	entries []SumEntry
 }
 
 // newSummary ...
 func newSummary() *Summary {
 	return &Summary{
-		entries: make([]*SumEntry, 0),
+		entries: make([]SumEntry, 0),
 	}
+}
+
+func (sum *Summary) clone() *Summary {
+	newSum := &Summary{
+		entries: make([]SumEntry, len(sum.entries)),
+	}
+	for i, entry := range sum.entries {
+		newSum.entries[i] = entry
+	}
+	return newSum
 }
 
 // buildFromBufferEntries ...
 func (sum *Summary) buildFromBufferEntries(bes []bufEntry) {
-	sum.entries = []*SumEntry{}
+	sum.entries = []SumEntry{}
 	// TODO: entries_.reserve(buffer_entries.size());
 	cumWeight := 0.0
 	for _, entry := range bes {
 		curWeight := entry.weight
-		se := &SumEntry{
+		se := SumEntry{
 			Value:   entry.value,
 			Weight:  entry.weight,
 			MinRank: cumWeight,
@@ -47,8 +57,8 @@ func (sum *Summary) buildFromBufferEntries(bes []bufEntry) {
 }
 
 // BuildFromSummaryEntries ...
-func (sum *Summary) BuildFromSummaryEntries(ses []*SumEntry) {
-	sum.entries = make([]*SumEntry, len(ses))
+func (sum *Summary) BuildFromSummaryEntries(ses []SumEntry) {
+	sum.entries = make([]SumEntry, len(ses))
 	for i, entry := range ses {
 		sum.entries[i] = entry
 	}
@@ -65,11 +75,11 @@ func (sum *Summary) Merge(other *Summary) {
 		return
 	}
 
-	baseEntries := make([]*SumEntry, len(sum.entries))
+	baseEntries := make([]SumEntry, len(sum.entries))
 	for i, e := range sum.entries {
 		baseEntries[i] = e
 	}
-	sum.entries = []*SumEntry{}
+	sum.entries = []SumEntry{}
 
 	// Merge entries maintaining ranks. The idea is to stack values
 	// in order which we can do in linear time as the two summaries are
@@ -89,7 +99,7 @@ func (sum *Summary) Merge(other *Summary) {
 		it1 := baseEntries[i]
 		it2 := otherEntries[j]
 		if it1.Value < it2.Value {
-			sum.entries = append(sum.entries, &SumEntry{
+			sum.entries = append(sum.entries, SumEntry{
 				Value: it1.Value, Weight: it1.Weight,
 				MinRank: it1.MinRank + nextMinRank2,
 				MaxRank: it1.MaxRank + it2.prevMaxRank(),
@@ -97,7 +107,7 @@ func (sum *Summary) Merge(other *Summary) {
 			nextMinRank1 = it1.nextMinRank()
 			i++
 		} else if it1.Value > it2.Value {
-			sum.entries = append(sum.entries, &SumEntry{
+			sum.entries = append(sum.entries, SumEntry{
 				Value: it2.Value, Weight: it2.Weight,
 				MinRank: it2.MinRank + nextMinRank1,
 				MaxRank: it2.MaxRank + it1.prevMaxRank(),
@@ -105,7 +115,7 @@ func (sum *Summary) Merge(other *Summary) {
 			nextMinRank2 = it2.nextMinRank()
 			j++
 		} else {
-			sum.entries = append(sum.entries, &SumEntry{
+			sum.entries = append(sum.entries, SumEntry{
 				Value: it1.Value, Weight: it1.Weight + it2.Weight,
 				MinRank: it1.MinRank + it2.MinRank,
 				MaxRank: it1.MaxRank + it2.MaxRank,
@@ -120,7 +130,7 @@ func (sum *Summary) Merge(other *Summary) {
 	// Fill in any residual.
 	for i != len(baseEntries) {
 		it1 := baseEntries[i]
-		sum.entries = append(sum.entries, &SumEntry{
+		sum.entries = append(sum.entries, SumEntry{
 			Value: it1.Value, Weight: it1.Weight,
 			MinRank: it1.MinRank + nextMinRank2,
 			MaxRank: it1.MaxRank + otherEntries[len(otherEntries)-1].MaxRank,
@@ -129,7 +139,7 @@ func (sum *Summary) Merge(other *Summary) {
 	}
 	for j != len(otherEntries) {
 		it2 := otherEntries[j]
-		sum.entries = append(sum.entries, &SumEntry{
+		sum.entries = append(sum.entries, SumEntry{
 			Value: it2.Value, Weight: it2.Weight,
 			MinRank: it2.MinRank + nextMinRank1,
 			MaxRank: it2.MaxRank + baseEntries[len(baseEntries)-1].MaxRank,
@@ -293,5 +303,5 @@ func (sum *Summary) Size() int64 {
 
 // Clear ...
 func (sum *Summary) Clear() {
-	sum.entries = []*SumEntry{}
+	sum.entries = []SumEntry{}
 }
