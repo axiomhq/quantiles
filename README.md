@@ -52,31 +52,26 @@ func Example() {
 			panic(err)
 		}
 	}
-	fmt.Print("ApproximationError:")
-	fmt.Println(qstream.ApproximationError(1))
+	fmt.Print("ApproximationError:") 	
+	fmt.Println(qstream.ApproximationError(1))  // 0 <nil>
 
-	fmt.Print("Finalize:")
-	fmt.Println(qstream.Finalize())
+	fmt.Print("Finalize:") 
+	fmt.Println(qstream.Finalize())            // <nil>
 
-	fmt.Print("GenerateQuantiles(4):")
-	fmt.Println(qstream.GenerateQuantiles(4))
+ 
+	fmt.Print("GenerateQuantiles(4):")         
+	fmt.Println(qstream.GenerateQuantiles(4))  // [0 251865 503730 746595 999999] <nil>
+
 
 	fmt.Print("GenerateQuantiles(10):")
-	fmt.Println(qstream.GenerateQuantiles(10))
+	fmt.Println(qstream.GenerateQuantiles(10)) // [0 98946 197892 296838 395789 503730 602676 701622 800568 899514 999999] <nil>
 
 	sum, err := qstream.FinalSummary()
 	if err != nil {
 		panic(err)
 	}
 	fmt.Print("GenerateQuantiles(4):")
-	fmt.Println(sum.GenerateQuantiles(4))
-
-	// Output:
-	// ApproximationError:0 <nil>
-	// Finalize:<nil>
-	// GenerateQuantiles(4):[0 251865 503730 746595 999999] <nil>
-	// GenerateQuantiles(10):[0 98946 197892 296838 395789 503730 602676 701622 800568 899514 999999] <nil>
-	// GenerateQuantiles(4):[0 251865 503730 746595 999999]
+	fmt.Println(sum.GenerateQuantiles(4))     // [0 251865 503730 746595 999999]
 }
 ```
 
