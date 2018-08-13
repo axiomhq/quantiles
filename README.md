@@ -7,7 +7,7 @@ This implementation is an adaptation of techniques from the following papers:
 * (2007) [A fast algorithm for approximate quantiles in high speed data streams](http://web.cs.ucla.edu/~weiwang/paper/SSDBM07_2.pdf).
 * (2016) [XGBoost: A Scalable Tree Boosting System](https://arxiv.org/pdf/1603.02754.pdf).
 
-### The key ideas at play are the following:
+#### The key ideas at play are the following:
 * Maintain an in-memory multi-level quantile summary in a way to guarantee
   a maximum approximation error of `eps * W` per bucket where `W` is the total
   weight across all points in the input dataset.
@@ -24,7 +24,7 @@ This implementation is an adaptation of techniques from the following papers:
 We mainly want to max out IO bw by ensuring we're not compute-bound and
 using a reasonable amount of RAM.
 
-### Complexity:
+#### Complexity:
 * Compute: `O(n * log(1/eps * log(eps * n)))`.
 * Memory: `O(1/eps * log^2(eps * n))` <- for one worker streaming through the entire dataset.
 
@@ -32,8 +32,8 @@ An epsilon value of zero would make the algorithm extremely inefficent and
 therefore, is disallowed.
 
 
-## Example
-```
+## Example Usage
+```go
 package quantiles_test
 
 import (
@@ -52,31 +52,26 @@ func Example() {
 			panic(err)
 		}
 	}
-	fmt.Print("ApproximationError:")
-	fmt.Println(qstream.ApproximationError(1))
+	fmt.Print("ApproximationError:") 	
+	fmt.Println(qstream.ApproximationError(1))  // 0 <nil>
 
-	fmt.Print("Finalize:")
-	fmt.Println(qstream.Finalize())
+	fmt.Print("Finalize:") 
+	fmt.Println(qstream.Finalize())            // <nil>
 
-	fmt.Print("GenerateQuantiles(4):")
-	fmt.Println(qstream.GenerateQuantiles(4))
+ 
+	fmt.Print("GenerateQuantiles(4):")         
+	fmt.Println(qstream.GenerateQuantiles(4))  // [0 251865 503730 746595 999999] <nil>
+
 
 	fmt.Print("GenerateQuantiles(10):")
-	fmt.Println(qstream.GenerateQuantiles(10))
+	fmt.Println(qstream.GenerateQuantiles(10)) // [0 98946 197892 296838 395789 503730 602676 701622 800568 899514 999999] <nil>
 
 	sum, err := qstream.FinalSummary()
 	if err != nil {
 		panic(err)
 	}
 	fmt.Print("GenerateQuantiles(4):")
-	fmt.Println(sum.GenerateQuantiles(4))
-
-	// Output:
-	// ApproximationError:0 <nil>
-	// Finalize:<nil>
-	// GenerateQuantiles(4):[0 251865 503730 746595 999999] <nil>
-	// GenerateQuantiles(10):[0 98946 197892 296838 395789 503730 602676 701622 800568 899514 999999] <nil>
-	// GenerateQuantiles(4):[0 251865 503730 746595 999999]
+	fmt.Println(sum.GenerateQuantiles(4))     // [0 251865 503730 746595 999999]
 }
 ```
 
