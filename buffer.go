@@ -5,6 +5,13 @@ import (
 	"sort"
 )
 
+// byValue implements sort.Interface based on the value field.
+type byValue []bufEntry
+
+func (a byValue) Len() int           { return len(a) }
+func (a byValue) Less(i, j int) bool { return a[i].value < a[j].value }
+func (a byValue) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
 // bufEntry ...
 type bufEntry struct {
 	value  float64
@@ -12,8 +19,9 @@ type bufEntry struct {
 }
 
 type buffer struct {
-	vec     []bufEntry
+	vec     byValue
 	maxSize int64
+	curSize int64
 }
 
 func newBuffer(blockSize, maxElements int64) (*buffer, error) {
@@ -28,7 +36,8 @@ func newBuffer(blockSize, maxElements int64) (*buffer, error) {
 
 	return &buffer{
 		maxSize: maxSize,
-		vec:     make([]bufEntry, 0),
+		curSize: 0,
+		vec:     make([]bufEntry, maxSize),
 	}, nil
 }
 
@@ -44,7 +53,8 @@ func (buf *buffer) push(value, weight float64) error {
 	}
 
 	if weight > 0 {
-		buf.vec = append(buf.vec, bufEntry{value, weight})
+		buf.vec[buf.curSize] = bufEntry{value, weight}
+		buf.curSize++
 	}
 	return nil
 }
@@ -53,12 +63,10 @@ func (buf *buffer) push(value, weight float64) error {
 // Callers should minimize how often this is called, ideally only right after
 // the buffer becomes full.
 func (buf *buffer) generateEntryList() []bufEntry {
-	sort.Slice(buf.vec, func(i, j int) bool { return buf.vec[i].value < buf.vec[j].value })
-	ret := make([]bufEntry, len(buf.vec), len(buf.vec))
-	for i, val := range buf.vec {
-		ret[i] = val
-	}
-	buf.vec = []bufEntry{}
+	sort.Sort(buf.vec)
+	ret := buf.vec
+	buf.vec = make([]bufEntry, buf.maxSize)
+	buf.curSize = 0
 
 	numEntries := 0
 	for i := 1; i < len(ret); i++ {
@@ -78,5 +86,5 @@ func (buf *buffer) generateEntryList() []bufEntry {
 
 // isFull ...
 func (buf *buffer) isFull() bool {
-	return int64(len(buf.vec)) >= buf.maxSize
+	return buf.curSize >= buf.maxSize
 }

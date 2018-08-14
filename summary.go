@@ -59,9 +59,9 @@ func (sum *Summary) clone() *Summary {
 }
 
 func (sum *Summary) buildFromBufferEntries(bes []bufEntry) {
-	sum.entries = []SumEntry{}
+	sum.entries = make([]SumEntry, len(bes))
 	cumWeight := 0.0
-	for _, entry := range bes {
+	for i, entry := range bes {
 		curWeight := entry.weight
 		se := SumEntry{
 			value:   entry.value,
@@ -69,16 +69,13 @@ func (sum *Summary) buildFromBufferEntries(bes []bufEntry) {
 			minRank: cumWeight,
 			maxRank: cumWeight + curWeight,
 		}
-		sum.entries = append(sum.entries, se)
+		sum.entries[i] = se
 		cumWeight += curWeight
 	}
 }
 
 func (sum *Summary) buildFromSummaryEntries(ses []SumEntry) {
-	sum.entries = make([]SumEntry, len(ses))
-	for i, entry := range ses {
-		sum.entries[i] = entry
-	}
+	sum.entries = ses
 }
 
 // Merge another summary into the this summary (great for esimating quantiles over several streams)
@@ -88,15 +85,12 @@ func (sum *Summary) Merge(other *Summary) {
 		return
 	}
 	if len(sum.entries) == 0 {
-		sum.buildFromSummaryEntries(other.entries)
+		sum.entries = otherEntries
 		return
 	}
 
-	baseEntries := make([]SumEntry, len(sum.entries))
-	for i, e := range sum.entries {
-		baseEntries[i] = e
-	}
-	sum.entries = []SumEntry{}
+	baseEntries := sum.entries
+	sum.entries = make([]SumEntry, len(baseEntries)+len(otherEntries))
 
 	// Merge entries maintaining ranks. The idea is to stack values
 	// in order which we can do in linear time as the two summaries are
@@ -112,57 +106,63 @@ func (sum *Summary) Merge(other *Summary) {
 		nextMinRank2 float64
 	)
 
+	num := 0
 	for i != len(baseEntries) && j != len(otherEntries) {
 		it1 := baseEntries[i]
 		it2 := otherEntries[j]
 		if it1.value < it2.value {
-			sum.entries = append(sum.entries, SumEntry{
+			sum.entries[num] = SumEntry{
 				value: it1.value, weight: it1.weight,
 				minRank: it1.minRank + nextMinRank2,
 				maxRank: it1.maxRank + it2.prevMaxRank(),
-			})
+			}
 			nextMinRank1 = it1.nextMinRank()
 			i++
 		} else if it1.value > it2.value {
-			sum.entries = append(sum.entries, SumEntry{
+			sum.entries[num] = SumEntry{
 				value: it2.value, weight: it2.weight,
 				minRank: it2.minRank + nextMinRank1,
 				maxRank: it2.maxRank + it1.prevMaxRank(),
-			})
+			}
 			nextMinRank2 = it2.nextMinRank()
 			j++
 		} else {
-			sum.entries = append(sum.entries, SumEntry{
+			sum.entries[num] = SumEntry{
 				value: it1.value, weight: it1.weight + it2.weight,
 				minRank: it1.minRank + it2.minRank,
 				maxRank: it1.maxRank + it2.maxRank,
-			})
+			}
 			nextMinRank1 = it1.nextMinRank()
 			nextMinRank2 = it2.nextMinRank()
 			i++
 			j++
 		}
+		num++
 	}
 
 	// Fill in any residual.
 	for i != len(baseEntries) {
 		it1 := baseEntries[i]
-		sum.entries = append(sum.entries, SumEntry{
+		sum.entries[num] = SumEntry{
 			value: it1.value, weight: it1.weight,
 			minRank: it1.minRank + nextMinRank2,
 			maxRank: it1.maxRank + otherEntries[len(otherEntries)-1].maxRank,
-		})
+		}
 		i++
+		num++
 	}
 	for j != len(otherEntries) {
 		it2 := otherEntries[j]
-		sum.entries = append(sum.entries, SumEntry{
+		sum.entries[num] = SumEntry{
 			value: it2.value, weight: it2.weight,
 			minRank: it2.minRank + nextMinRank1,
 			maxRank: it2.maxRank + baseEntries[len(baseEntries)-1].maxRank,
-		})
+		}
 		j++
+		num++
 	}
+	sum.entries = sum.entries[:num]
+
 }
 
 func (sum *Summary) compress(sizeHint int64, minEps float64) {
@@ -217,9 +217,8 @@ func (sum *Summary) GenerateBoundaries(numBoundaries int64) []float64 {
 	// of the summary and retrieve the values.
 	// The resulting boundaries are guaranteed to both contain at least
 	// num_boundaries unique elements and maintain approximation bounds.
-	output := []float64{}
 	if len(sum.entries) == 0 {
-		return output
+		return []float64{}
 	}
 
 	// Generate soft compressed summary.
@@ -232,6 +231,7 @@ func (sum *Summary) GenerateBoundaries(numBoundaries int64) []float64 {
 	compressedSummary.compress(numBoundaries, compressionEps)
 
 	// Return boundaries.
+	output := make([]float64, len(compressedSummary.entries))
 	for _, entry := range compressedSummary.entries {
 		output = append(output, entry.value)
 	}
@@ -244,14 +244,14 @@ func (sum *Summary) GenerateQuantiles(numQuantiles int64) []float64 {
 	// original summary. The following algorithm is an efficient cache-friendly
 	// O(n) implementation of that idea which avoids the cost of the repetitive
 	// full rank queries O(nlogn).
-	output := []float64{}
 	if len(sum.entries) == 0 {
-		return output
+		return []float64{}
 	}
 	if numQuantiles < 2 {
 		numQuantiles = 2
 	}
 	curIdx := 0
+	output := make([]float64, numQuantiles+1)
 	for rank := 0.0; rank <= float64(numQuantiles); rank++ {
 		d2 := 2 * (rank * sum.entries[len(sum.entries)-1].maxRank / float64(numQuantiles))
 		nextIdx := curIdx + 1
@@ -261,9 +261,9 @@ func (sum *Summary) GenerateQuantiles(numQuantiles int64) []float64 {
 		curIdx = nextIdx - 1
 		// Determine insertion order.
 		if nextIdx == len(sum.entries) || d2 < sum.entries[curIdx].nextMinRank()+sum.entries[nextIdx].prevMaxRank() {
-			output = append(output, sum.entries[curIdx].value)
+			output[int(rank)] = sum.entries[curIdx].value
 		} else {
-			output = append(output, sum.entries[nextIdx].value)
+			output[int(rank)] = sum.entries[nextIdx].value
 		}
 	}
 	return output

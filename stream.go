@@ -104,7 +104,7 @@ func (stream *Stream) PushSummary(summary []SumEntry) error {
 		return fmt.Errorf("Finalize() already called")
 	}
 	stream.localSummary.buildFromSummaryEntries(summary)
-	stream.localSummary.compress(stream.blockSize, stream.eps)
+	//stream.localSummary.compress(stream.blockSize, stream.eps)
 	return stream.propagateLocalSummary()
 }
 
@@ -144,8 +144,7 @@ func (stream *Stream) propagateLocalSummary() error {
 		return nil
 	}
 
-	var level int64
-	for settled := false; !settled; level++ {
+	for level, settled := int64(0), false; !settled; level++ {
 		// Ensure we have enough depth.
 		if int64(len(stream.summaryLevels)) <= level {
 			stream.summaryLevels = append(stream.summaryLevels, &Summary{})
@@ -161,7 +160,6 @@ func (stream *Stream) propagateLocalSummary() error {
 			*currentSummary = *(stream.localSummary)
 			stream.localSummary = newSummary()
 			settled = true
-
 		} else {
 			// Compress, empty current level and propagate.
 			stream.localSummary.compress(stream.blockSize, stream.eps)
