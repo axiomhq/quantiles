@@ -71,8 +71,8 @@ func (buf *buffer) generateEntryList() []bufEntry {
 	numEntries := 0
 	for i := 1; i < len(ret); i++ {
 		if ret[i].value != ret[i-1].value {
-			ret[numEntries] = ret[i]
 			numEntries++
+			ret[numEntries] = ret[i]
 		} else {
 			ret[numEntries].weight += ret[i].weight
 		}
