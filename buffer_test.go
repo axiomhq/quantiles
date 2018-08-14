@@ -1,6 +1,7 @@
 package quantiles
 
 import (
+	"math/rand"
 	"reflect"
 	"testing"
 )
@@ -74,5 +75,45 @@ func TestBufferPushEntryFullDeath(t *testing.T) {
 	}
 	if err := buf.push(6, 6); err == nil {
 		t.Error("expected buffer already full")
+	}
+}
+
+func push(n int) error {
+	buf, _ := newBuffer(int64(n), int64(n))
+	for i := 0; i < n; i++ {
+		if err := buf.push(rand.Float64(), rand.Float64()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func BenchmarkPush100(b *testing.B) {
+	// run the Fib function b.N times
+	for n := 0; n < b.N; n++ {
+		if err := push(100); err != nil {
+			b.Error(err)
+			return
+		}
+	}
+}
+
+func BenchmarkPush1000(b *testing.B) {
+	// run the Fib function b.N times
+	for n := 0; n < b.N; n++ {
+		if err := push(1000); err != nil {
+			b.Error(err)
+			return
+		}
+	}
+}
+
+func BenchmarkPush10000(b *testing.B) {
+	// run the Fib function b.N times
+	for n := 0; n < b.N; n++ {
+		if err := push(10000); err != nil {
+			b.Error(err)
+			return
+		}
 	}
 }

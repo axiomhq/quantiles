@@ -63,17 +63,16 @@ func (buf *buffer) push(value, weight float64) error {
 // Callers should minimize how often this is called, ideally only right after
 // the buffer becomes full.
 func (buf *buffer) generateEntryList() []bufEntry {
-	sort.Sort(buf.vec)
-	ret := buf.vec
+	sort.Sort(buf.vec[:buf.curSize])
+	ret := buf.vec[:buf.curSize]
 	buf.vec = make([]bufEntry, buf.maxSize)
 	buf.curSize = 0
 
 	numEntries := 0
 	for i := 1; i < len(ret); i++ {
 		if ret[i].value != ret[i-1].value {
-			tmp := ret[i]
+			ret[numEntries] = ret[i]
 			numEntries++
-			ret[numEntries] = tmp
 		} else {
 			ret[numEntries].weight += ret[i].weight
 		}
