@@ -7,10 +7,7 @@ import (
 )
 
 func main() {
-	qstream, err := quantiles.New(0.01, 1<<4)
-	if err != nil {
-		panic(err)
-	}
+	qstream := quantiles.NewDefault()
 	for i := 0.0; i < 1e6; i++ {
 		if err := qstream.Push(i, 1.0); err != nil {
 			panic(err)

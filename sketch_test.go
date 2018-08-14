@@ -52,7 +52,7 @@ func TestNonZeroEps(t *testing.T) {
 	assert.Equal(tup, tuple{26, 25001})
 }
 
-func generateFixedUniformSummary(workerID int32, maxElements int64, totalWeight *float64, stream *Stream) error {
+func generateFixedUniformSummary(workerID int32, maxElements int64, totalWeight *float64, stream *Sketch) error {
 	for i := int64(0); i < maxElements; i++ {
 		x := float64(i) / float64(maxElements)
 		if err := stream.Push(x, 1); err != nil {
@@ -63,7 +63,7 @@ func generateFixedUniformSummary(workerID int32, maxElements int64, totalWeight 
 	return stream.Finalize()
 }
 
-func generateRandUniformFixedWeightsSummary(workerID int32, maxElements int64, totalWeight *float64, stream *Stream) error {
+func generateRandUniformFixedWeightsSummary(workerID int32, maxElements int64, totalWeight *float64, stream *Sketch) error {
 	for i := int64(0); i < maxElements; i++ {
 		x := rand.Float64()
 		stream.Push(x, 1)
@@ -72,7 +72,7 @@ func generateRandUniformFixedWeightsSummary(workerID int32, maxElements int64, t
 	return stream.Finalize()
 }
 
-func generateFixedNonUniformSummary(workerID int32, maxElements int64, totalWeight *float64, stream *Stream) error {
+func generateFixedNonUniformSummary(workerID int32, maxElements int64, totalWeight *float64, stream *Sketch) error {
 	for i := int64(0); i < maxElements; i++ {
 		x := float64(i) / float64(maxElements)
 		stream.Push(x, x)
@@ -81,7 +81,7 @@ func generateFixedNonUniformSummary(workerID int32, maxElements int64, totalWeig
 	return stream.Finalize()
 }
 
-func generateRandUniformRandWeightsSummary(workerID int32, maxElements int64, totalWeight *float64, stream *Stream) error {
+func generateRandUniformRandWeightsSummary(workerID int32, maxElements int64, totalWeight *float64, stream *Sketch) error {
 	for i := int64(0); i < maxElements; i++ {
 		x := rand.Float64()
 		w := rand.Float64()
@@ -91,7 +91,7 @@ func generateRandUniformRandWeightsSummary(workerID int32, maxElements int64, to
 	return stream.Finalize()
 }
 
-type workerSummaryGeneratorFunc func(int32, int64, *float64, *Stream) error
+type workerSummaryGeneratorFunc func(int32, int64, *float64, *Sketch) error
 
 func testSingleWorkerStreams(t *testing.T, eps float64, maxElements int64,
 	workerSummaryGenerator workerSummaryGeneratorFunc,
@@ -144,14 +144,14 @@ func testSingleWorkerStreams(t *testing.T, eps float64, maxElements int64,
 }
 
 // Stream generators.
-func generateOneValue(workerID int32, maxElements int64, totalWeight *float64, stream *Stream) error {
+func generateOneValue(workerID int32, maxElements int64, totalWeight *float64, stream *Sketch) error {
 	stream.Push(10, 1)
 	*totalWeight++
 	return stream.Finalize()
 }
 
 // Stream generators.
-func generateOneZeroWeightedValue(workerID int32, maxElements int64, totalWeight *float64, stream *Stream) error {
+func generateOneZeroWeightedValue(workerID int32, maxElements int64, totalWeight *float64, stream *Sketch) error {
 	stream.Push(10, 0)
 	return stream.Finalize()
 }

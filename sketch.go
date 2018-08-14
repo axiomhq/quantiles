@@ -5,8 +5,8 @@ import (
 	"math"
 )
 
-// Stream ...
-type Stream struct {
+// Sketch ...
+type Sketch struct {
 	eps           float64
 	maxLevels     int64
 	blockSize     int64
@@ -16,8 +16,14 @@ type Stream struct {
 	finalized     bool
 }
 
-// New ...
-func New(eps float64, maxElements int64) (*Stream, error) {
+// NewDefault returns a new Sketch with the eps = 0.01 and maxElements 1000
+func NewDefault() *Sketch {
+	stream, _ := New(0.01, 1000)
+	return stream
+}
+
+// New returns a new Sketch for a given eps and maxElements
+func New(eps float64, maxElements int64) (*Sketch, error) {
 	if eps <= 0 {
 		return nil, fmt.Errorf("an epsilon value of zero is not allowed")
 	}
@@ -32,7 +38,7 @@ func New(eps float64, maxElements int64) (*Stream, error) {
 		return nil, err
 	}
 
-	stream := &Stream{
+	stream := &Sketch{
 		eps:           eps,
 		buffer:        buffer,
 		finalized:     false,
@@ -44,8 +50,8 @@ func New(eps float64, maxElements int64) (*Stream, error) {
 	return stream, nil
 }
 
-func (stream *Stream) clone() *Stream {
-	newStream := &Stream{
+func (stream *Sketch) clone() *Sketch {
+	newStream := &Sketch{
 		eps:           stream.eps,
 		buffer:        stream.buffer.clone(),
 		finalized:     stream.finalized,
@@ -61,7 +67,7 @@ func (stream *Stream) clone() *Stream {
 }
 
 // QuickQuantiles returns current quantiles without having a final state of the stream
-func (stream *Stream) QuickQuantiles(numQuantiles int64) ([]float64, error) {
+func (stream *Sketch) QuickQuantiles(numQuantiles int64) ([]float64, error) {
 	tmpStream := stream.clone()
 	if err := tmpStream.Finalize(); err != nil {
 		return nil, err
@@ -70,7 +76,7 @@ func (stream *Stream) QuickQuantiles(numQuantiles int64) ([]float64, error) {
 }
 
 // Push a value and a weight into the stream
-func (stream *Stream) Push(value float64, weight float64) error {
+func (stream *Sketch) Push(value float64, weight float64) error {
 	// Validate state.
 	var err error
 	if stream.finalized {
@@ -87,7 +93,7 @@ func (stream *Stream) Push(value float64, weight float64) error {
 	return err
 }
 
-func (stream *Stream) pushBuffer(buf *buffer) error {
+func (stream *Sketch) pushBuffer(buf *buffer) error {
 	// Validate state.
 	if stream.finalized {
 		return fmt.Errorf("Finalize() already called")
@@ -98,7 +104,7 @@ func (stream *Stream) pushBuffer(buf *buffer) error {
 }
 
 // PushSummary pushes full summary while maintaining approximation error invariants.
-func (stream *Stream) PushSummary(summary []SumEntry) error {
+func (stream *Sketch) PushSummary(summary []SumEntry) error {
 	// Validate state.
 	if stream.finalized {
 		return fmt.Errorf("Finalize() already called")
@@ -109,7 +115,7 @@ func (stream *Stream) PushSummary(summary []SumEntry) error {
 }
 
 // Finalize flushes approximator and finalizes state.
-func (stream *Stream) Finalize() error {
+func (stream *Sketch) Finalize() error {
 	// Validate state.
 	if stream.finalized {
 		return fmt.Errorf("Finalize() already called")
@@ -133,7 +139,7 @@ func (stream *Stream) Finalize() error {
 propagates local summary through summary levels while maintaining
 approximation error invariants.
 */
-func (stream *Stream) propagateLocalSummary() error {
+func (stream *Sketch) propagateLocalSummary() error {
 	// Validate state.
 	if stream.finalized {
 		return fmt.Errorf("Finalize() already called")
@@ -174,7 +180,7 @@ GenerateQuantiles generates requested number of quantiles after finalizing strea
 The returned quantiles can be queried using std::lower_bound to get
 the bucket for a given value.
 */
-func (stream *Stream) GenerateQuantiles(numQuantiles int64) ([]float64, error) {
+func (stream *Sketch) GenerateQuantiles(numQuantiles int64) ([]float64, error) {
 	if !stream.finalized {
 		return nil, fmt.Errorf("Finalize() must be called before generating quantiles")
 	}
@@ -191,7 +197,7 @@ Boundaries are preferable over quantiles when the caller is less
 interested in the actual quantiles distribution and more interested in
 getting a representative sample of boundary values.
 */
-func (stream *Stream) GenerateBoundaries(numBoundaries int64) ([]float64, error) {
+func (stream *Sketch) GenerateBoundaries(numBoundaries int64) ([]float64, error) {
 	if !stream.finalized {
 		return nil, fmt.Errorf("Finalize() must be called before generating quantiles")
 	}
@@ -204,7 +210,7 @@ If the passed level is negative, the approximation error for the entire
 summary is returned. Note that after Finalize is called, only the overall
 error is available.
 */
-func (stream *Stream) ApproximationError(level int64) (float64, error) {
+func (stream *Sketch) ApproximationError(level int64) (float64, error) {
 	if stream.finalized {
 		if level > 0 {
 			return 0, fmt.Errorf("only overall error is available after Finalize()")
@@ -230,12 +236,12 @@ func (stream *Stream) ApproximationError(level int64) (float64, error) {
 }
 
 // MaxDepth ...
-func (stream *Stream) MaxDepth() int {
+func (stream *Sketch) MaxDepth() int {
 	return len(stream.summaryLevels)
 }
 
 // FinalSummary ...
-func (stream *Stream) FinalSummary() (*Summary, error) {
+func (stream *Sketch) FinalSummary() (*Summary, error) {
 	if !stream.finalized {
 		return nil, fmt.Errorf("Finalize() must be called before generating quantiles")
 	}
