@@ -181,13 +181,10 @@ func (stream *Sketch) propagateLocalSummary() error {
 
 // Quantile ...
 func (stream *Sketch) Quantile(q float64) (float64, error) {
-	if q < 0 || q > 1 {
-		return 0, fmt.Errorf("expected 0 <= q <= 1, got q = %v", q)
-	}
 	if !stream.finalized {
 		return 0, fmt.Errorf("Finalize() must be called before generating quantiles")
 	}
-	return stream.localSummary.Quantile(q), nil
+	return stream.localSummary.Quantile(q)
 }
 
 /*

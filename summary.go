@@ -1,5 +1,7 @@
 package quantiles
 
+import "fmt"
+
 // SumEntry represents a summary entry
 type SumEntry struct {
 	value   float64
@@ -239,21 +241,24 @@ func (sum *Summary) GenerateBoundaries(numBoundaries int64) []float64 {
 	return output
 }
 
-// Quantile ...
-func (sum *Summary) Quantile(q float64) float64 {
+// Quantile returns the value for quantile q
+func (sum *Summary) Quantile(q float64) (float64, error) {
 	// To construct the desired n-quantiles we repetitively query n ranks from the
 	// original summary. The following algorithm is an efficient cache-friendly
 	// O(n) implementation of that idea which avoids the cost of the repetitive
 	// full rank queries O(nlogn).
+	if q < 0 || q > 1 {
+		return 0, fmt.Errorf("expected 0 <= q <= 1, got q = %v", q)
+	}
 	numQuantiles := int64(sum.n)
 	if numQuantiles == 0 {
-		return 0
+		return 0, nil
 	}
-	qIdx := int(float64(numQuantiles)*q + 0.5)
 	if len(sum.quantiles) == 0 {
 		sum.quantiles = sum.GenerateQuantiles(numQuantiles + 1)
 	}
-	return sum.quantiles[qIdx]
+	qIdx := int(float64(numQuantiles)*q + 0.5)
+	return sum.quantiles[qIdx], nil
 }
 
 // GenerateQuantiles returns a slice of float64 of size numQuantiles+1, the ith entry is the `i * 1/numQuantiles+1` quantile
