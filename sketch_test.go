@@ -356,7 +356,7 @@ func TestSketchMedian(t *testing.T) {
 	}
 
 	numQ := int64(100)
-	qs, _ := q.QuickQuantiles(numQ)
+	qs, _ := q.InterimQuantiles(numQ)
 	for q, val := range exp {
 		assert.Equal(val, qs[int(q*float64(numQ))])
 	}
