@@ -42,8 +42,15 @@ func newBuffer(blockSize, maxElements int64) (*buffer, error) {
 }
 
 func (buf *buffer) clone() *buffer {
-	newBuffer := *buf
-	return &newBuffer
+	newBuffer := &buffer{
+		maxSize: buf.maxSize,
+		curSize: buf.curSize,
+		vec:     make([]bufEntry, buf.maxSize),
+	}
+	for i, e := range buf.vec {
+		newBuffer.vec[i] = e
+	}
+	return newBuffer
 }
 
 func (buf *buffer) push(value, weight float64) error {
