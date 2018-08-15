@@ -38,7 +38,9 @@ func (se SumEntry) nextMinRank() float64 {
 
 // Summary is a summarizes the stream entries
 type Summary struct {
-	entries []SumEntry
+	entries   []SumEntry
+	n         uint64
+	quantiles []float64
 }
 
 // newSummary ...
@@ -235,6 +237,23 @@ func (sum *Summary) GenerateBoundaries(numBoundaries int64) []float64 {
 		output = append(output, entry.value)
 	}
 	return output
+}
+
+// Quantile ...
+func (sum *Summary) Quantile(q float64) float64 {
+	// To construct the desired n-quantiles we repetitively query n ranks from the
+	// original summary. The following algorithm is an efficient cache-friendly
+	// O(n) implementation of that idea which avoids the cost of the repetitive
+	// full rank queries O(nlogn).
+	numQuantiles := int64(sum.n)
+	if numQuantiles == 0 {
+		return 0
+	}
+	qIdx := int(float64(numQuantiles)*q + 0.5)
+	if len(sum.quantiles) == 0 {
+		sum.quantiles = sum.GenerateQuantiles(numQuantiles + 1)
+	}
+	return sum.quantiles[qIdx]
 }
 
 // GenerateQuantiles returns a slice of float64 of size numQuantiles+1, the ith entry is the `i * 1/numQuantiles+1` quantile

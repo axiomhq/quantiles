@@ -330,7 +330,7 @@ func TestRandUniformRandWeightsDistributed(t *testing.T) {
 
 func TestSketchMedian(t *testing.T) {
 	assert := assert.New(t)
-	q := NewDefault()
+	q, _ := New(0.5, 1000)
 
 	for i := 0; i < 402; i++ {
 		q.Push(10, 1)
@@ -355,10 +355,12 @@ func TestSketchMedian(t *testing.T) {
 		0.9: 10,
 	}
 
-	numQ := int64(100)
-	qs, _ := q.InterimQuantiles(numQ)
-	for q, val := range exp {
-		assert.Equal(val, qs[int(q*float64(numQ))])
+	err := q.Finalize()
+	assert.NoError(err)
+	for i, val := range exp {
+		x, err := q.Quantile(i)
+		assert.NoError(err)
+		assert.Equal(val, x)
 	}
 
 }

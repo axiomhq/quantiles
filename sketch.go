@@ -14,6 +14,7 @@ type Sketch struct {
 	localSummary  *Summary
 	summaryLevels []*Summary
 	finalized     bool
+	n             uint64
 }
 
 // NewDefault returns a new Sketch with the eps = 0.01 and maxElements 1000
@@ -90,6 +91,7 @@ func (stream *Sketch) Push(value float64, weight float64) error {
 	if stream.buffer.isFull() {
 		err = stream.pushBuffer(stream.buffer)
 	}
+	stream.n++
 	return err
 }
 
@@ -110,7 +112,7 @@ func (stream *Sketch) PushSummary(summary []SumEntry) error {
 		return fmt.Errorf("Finalize() already called")
 	}
 	stream.localSummary.buildFromSummaryEntries(summary)
-	//stream.localSummary.compress(stream.blockSize, stream.eps)
+	stream.localSummary.compress(stream.blockSize, stream.eps)
 	return stream.propagateLocalSummary()
 }
 
@@ -129,6 +131,7 @@ func (stream *Sketch) Finalize() error {
 	for _, summary := range stream.summaryLevels {
 		stream.localSummary.Merge(summary)
 	}
+	stream.localSummary.n = stream.n
 
 	stream.summaryLevels = []*Summary{}
 	stream.finalized = true
@@ -172,7 +175,19 @@ func (stream *Sketch) propagateLocalSummary() error {
 			currentSummary.Clear()
 		}
 	}
+	stream.localSummary.n = stream.n
 	return nil
+}
+
+// Quantile ...
+func (stream *Sketch) Quantile(q float64) (float64, error) {
+	if q < 0 || q > 1 {
+		return 0, fmt.Errorf("expected 0 <= q <= 1, got q = %v", q)
+	}
+	if !stream.finalized {
+		return 0, fmt.Errorf("Finalize() must be called before generating quantiles")
+	}
+	return stream.localSummary.Quantile(q), nil
 }
 
 /*
