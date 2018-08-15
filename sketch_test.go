@@ -327,3 +327,38 @@ func TestRandUniformRandWeightsDistributed(t *testing.T) {
 	testDistributedStreams(t, numWorkers, eps, maxElements, generateRandUniformRandWeightsSummary,
 		[]float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}, 1e-2)
 }
+
+func TestSketchMedian(t *testing.T) {
+	assert := assert.New(t)
+	q := NewDefault()
+
+	for i := 0; i < 402; i++ {
+		q.Push(10, 1)
+	}
+
+	for i := 0; i < 401; i++ {
+		q.Push(5, 1)
+	}
+	// make sure median is 6
+	q.Push(6, 1)
+	q.Push(6, 1)
+
+	exp := map[float64]float64{
+		0.1: 5,
+		0.2: 5,
+		0.3: 5,
+		0.4: 5,
+		0.5: 6,
+		0.6: 10,
+		0.7: 10,
+		0.8: 10,
+		0.9: 10,
+	}
+
+	numQ := int64(100)
+	qs, _ := q.QuickQuantiles(numQ)
+	for q, val := range exp {
+		assert.Equal(val, qs[int(q*float64(numQ))])
+	}
+
+}

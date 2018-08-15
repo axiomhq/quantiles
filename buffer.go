@@ -73,6 +73,9 @@ func (buf *buffer) generateEntryList() []bufEntry {
 	sort.Sort(buf.vec[:buf.curSize])
 	ret := buf.vec[:buf.curSize]
 	buf.vec = make([]bufEntry, buf.maxSize)
+	if buf.curSize == 0 {
+		return ret
+	}
 	buf.curSize = 0
 
 	numEntries := 0
@@ -83,9 +86,6 @@ func (buf *buffer) generateEntryList() []bufEntry {
 		} else {
 			ret[numEntries].weight += ret[i].weight
 		}
-	}
-	if numEntries == 0 {
-		return ret
 	}
 	return ret[:numEntries+1]
 }
