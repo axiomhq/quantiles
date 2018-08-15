@@ -66,8 +66,8 @@ func (stream *Sketch) clone() *Sketch {
 	return newStream
 }
 
-// QuickQuantiles returns current quantiles without having a final state of the stream
-func (stream *Sketch) QuickQuantiles(numQuantiles int64) ([]float64, error) {
+// InterimQuantiles returns current quantiles without having a final state of the stream. This operation clones the stream, the clone is then finalized
+func (stream *Sketch) InterimQuantiles(numQuantiles int64) ([]float64, error) {
 	tmpStream := stream.clone()
 	if err := tmpStream.Finalize(); err != nil {
 		return nil, err

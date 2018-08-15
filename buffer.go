@@ -77,7 +77,6 @@ func (buf *buffer) generateEntryList() []bufEntry {
 		return ret
 	}
 	buf.curSize = 0
-
 	numEntries := 0
 	for i := 1; i < len(ret); i++ {
 		if ret[i].value != ret[i-1].value {

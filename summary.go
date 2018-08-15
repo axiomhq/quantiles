@@ -63,13 +63,12 @@ func (sum *Summary) buildFromBufferEntries(bes []bufEntry) {
 	cumWeight := 0.0
 	for i, entry := range bes {
 		curWeight := entry.weight
-		se := SumEntry{
+		sum.entries[i] = SumEntry{
 			value:   entry.value,
 			weight:  entry.weight,
 			minRank: cumWeight,
 			maxRank: cumWeight + curWeight,
 		}
-		sum.entries[i] = se
 		cumWeight += curWeight
 	}
 }
