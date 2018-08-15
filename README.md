@@ -1,4 +1,5 @@
 # quantiles - Optimal Quantile Approximation in Streams
+[![GoDoc](https://godoc.org/github.com/axiomhq/quantiles?status.svg)](https://godoc.org/github.com/axiomhq/quantiles)
 
 This is a translation of [TensorFlow's quantile helper class](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/boosted_trees/lib/quantiles), it aims to compute approximate quantiles with error bound guarantees for weighted data sets.
 This implementation is an adaptation of techniques from the following papers:
