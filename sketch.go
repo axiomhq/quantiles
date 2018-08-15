@@ -5,6 +5,8 @@ import (
 	"math"
 )
 
+var errFinalized = fmt.Errorf("Finalize() already called")
+
 // Sketch ...
 type Sketch struct {
 	eps           float64
@@ -67,21 +69,12 @@ func (stream *Sketch) clone() *Sketch {
 	return newStream
 }
 
-// InterimQuantiles returns current quantiles without having a final state of the stream. This operation clones the stream, the clone is then finalized
-func (stream *Sketch) InterimQuantiles(numQuantiles int64) ([]float64, error) {
-	tmpStream := stream.clone()
-	if err := tmpStream.Finalize(); err != nil {
-		return nil, err
-	}
-	return tmpStream.GenerateQuantiles(numQuantiles)
-}
-
 // Push a value and a weight into the stream
 func (stream *Sketch) Push(value float64, weight float64) error {
 	// Validate state.
 	var err error
 	if stream.finalized {
-		return fmt.Errorf("Finalize() already called")
+		return errFinalized
 	}
 
 	if err = stream.buffer.push(value, weight); err != nil {
@@ -98,7 +91,7 @@ func (stream *Sketch) Push(value float64, weight float64) error {
 func (stream *Sketch) pushBuffer(buf *buffer) error {
 	// Validate state.
 	if stream.finalized {
-		return fmt.Errorf("Finalize() already called")
+		return errFinalized
 	}
 	stream.localSummary.buildFromBufferEntries(buf.generateEntryList())
 	stream.localSummary.compress(stream.blockSize, stream.eps)
@@ -109,7 +102,7 @@ func (stream *Sketch) pushBuffer(buf *buffer) error {
 func (stream *Sketch) PushSummary(summary []SumEntry) error {
 	// Validate state.
 	if stream.finalized {
-		return fmt.Errorf("Finalize() already called")
+		return errFinalized
 	}
 	stream.localSummary.buildFromSummaryEntries(summary)
 	stream.localSummary.compress(stream.blockSize, stream.eps)
@@ -120,7 +113,7 @@ func (stream *Sketch) PushSummary(summary []SumEntry) error {
 func (stream *Sketch) Finalize() error {
 	// Validate state.
 	if stream.finalized {
-		return fmt.Errorf("Finalize() already called")
+		return errFinalized
 	}
 
 	// Flush any remaining buffer elements.
@@ -145,7 +138,7 @@ approximation error invariants.
 func (stream *Sketch) propagateLocalSummary() error {
 	// Validate state.
 	if stream.finalized {
-		return fmt.Errorf("Finalize() already called")
+		return errFinalized
 	}
 
 	// No-op if there's nothing to add.
